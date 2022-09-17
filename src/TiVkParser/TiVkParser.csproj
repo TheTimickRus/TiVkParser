@@ -18,7 +18,13 @@
       <PackageReference Include="Serilog.Sinks.File" Version="5.0.1-dev-00947" />
       <PackageReference Include="Spectre.Console" Version="0.45.1-preview.0.4" />
       <PackageReference Include="Spectre.Console.Cli" Version="0.45.1-preview.0.4" />
+      <PackageReference Include="Tomlyn" Version="0.15.0" />
       <PackageReference Include="VkNet" Version="1.71.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Assets\TiVkParser.toml" />
+      <EmbeddedResource Include="Assets\TiVkParser.toml" />
     </ItemGroup>
 
 </Project>

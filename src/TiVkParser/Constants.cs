@@ -5,11 +5,6 @@ namespace TiVkParser;
 
 public static class Constants
 {
-    public static class Params
-    {
-        public const string AccessToken = "vk1.a.VKvZGRjUoJIJYIoFFx_pIrWS6DXQMXR1wRA52VyfLqBpDQRcSEp8ph4C3_GGC0uTz_4NfDtcavV1dSuhKvTlTotBVSRHApFrmOOh7bnLVM_el1WdiYlzWLqaF-2hYJ83dIgAABcppxCKg-yfKm2PvKjHaPGR-XebBCz62mEHkKOB4TGORBo3eMiQb2Gpxkcc";
-    }
-    
     public static class Titles
     {
         /// <summary>

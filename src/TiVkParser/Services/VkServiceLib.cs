@@ -11,11 +11,17 @@ namespace TiVkParser.Services;
 
 public class VkServiceLib
 {
-    private readonly IVkApi _api = new VkApi();
+    public bool IsAuth { get; set; }
 
-    public VkServiceLib(string accessToken)
+    private readonly IVkApi _api = new VkApi();
+    private readonly long _limit;
+
+    public VkServiceLib(string accessToken, long limit)
     {
         _api.Authorize(new ApiAuthParams { AccessToken = accessToken });
+        _api.Account.GetProfileInfo();
+        
+        _limit = limit;
     }
 
     /// <summary>
@@ -82,7 +88,7 @@ public class VkServiceLib
             Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты постов со стены
-            if (pagination.CurrentOffset > 3000)
+            if (pagination.CurrentOffset > _limit)
                 break;
             
             Thread.Sleep(333);
@@ -135,6 +141,10 @@ public class VkServiceLib
             pagination.Increment();
             Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
             
+            // Временное решение, чтобы не получать миллиарты постов со стены
+            if (pagination.CurrentOffset > _limit)
+                break;
+            
             Thread.Sleep(333);
         }
         
@@ -181,6 +191,10 @@ public class VkServiceLib
             pagination.Increment();
             Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
             
+            // Временное решение, чтобы не получать миллиарты постов со стены
+            if (pagination.CurrentOffset > _limit)
+                break;
+
             Thread.Sleep(333);
         }
         
@@ -229,6 +243,10 @@ public class VkServiceLib
             pagination.Increment();
             Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
             
+            // Временное решение, чтобы не получать миллиарты постов со стены
+            if (pagination.CurrentOffset > _limit)
+                break;
+
             Thread.Sleep(333);
         }
         
@@ -244,7 +262,6 @@ public class VkServiceLib
     public User? FetchUserById(long userId)
     {
         var users = _api.Users.Get(new[] { userId });
-        
         return users.Count > 0 
             ? users[0] 
             : null;
