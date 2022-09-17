@@ -261,9 +261,34 @@ public class VkServiceLib
     /// <returns>Пользователь</returns>
     public User? FetchUserById(long userId)
     {
-        var users = _api.Users.Get(new[] { userId });
-        return users.Count > 0 
-            ? users[0] 
-            : null;
+        try
+        {
+            return _api.Users.Get(new List<long> { userId }).FirstOrDefault();
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Получение пользователей по IDs
+    /// </summary>
+    /// <param name="ids">ID пользователей</param>
+    /// <returns>Пользователи</returns>
+    public IEnumerable<User> FetchUsersById(IEnumerable<long> ids)
+    {
+        try
+        {
+            return _api.Users.Get(ids);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return new List<User>();
     }
 }

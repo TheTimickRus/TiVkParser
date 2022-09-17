@@ -11,6 +11,7 @@ using TiVkParser.Helpers;
 using TiVkParser.Models;
 using TiVkParser.Services;
 using Tomlyn;
+using VkNet.Enums;
 
 namespace TiVkParser.Commands;
 
@@ -18,10 +19,15 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
 {
     public class Settings : CommandSettings
     {
-        [Description("Путь до файла конфигурации")]
+        [Description("Путь до файла конфигурации (Default = TiVkParser.toml)")]
         [CommandOption("-c|--cfg")]
         [DefaultValue("TiVkParser.toml")]
         public string ConfigFile { get; init; } = "TiVkParser.toml";
+
+        [Description("Общий лимит кол-ва получаемых объектов для всех запросов (Default = 100)")]
+        [CommandOption("-l|--limit")]
+        [DefaultValue((long)100)]
+        public long Limit { get; init; }
     }
 
     private ConfigurationModel? _conf;
@@ -52,16 +58,33 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
         AnsiConsoleLib.ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
         
-        var vkService = new VkServiceLib(_conf.AccessToken, 100);
+        var vkService = new VkServiceLib(_conf.AccessToken, settings.Limit);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
             .Columns(
                 new TaskDescriptionColumn(), 
-                new ProgressBarColumn(), 
-                new PercentageColumn(), 
-                new RemainingTimeColumn(), 
-                new SpinnerColumn()
+                new ProgressBarColumn
+                {
+                    IndeterminateStyle = new Style(foreground: Constants.Colors.MainColor),
+                    RemainingStyle = new Style(foreground: Constants.Colors.MainColor),
+                    CompletedStyle = new Style(Constants.Colors.SuccessColor)
+                }, 
+                new PercentageColumn
+                {
+                    Style = new Style(foreground: Constants.Colors.MainColor),
+                    CompletedStyle = new Style(Constants.Colors.SuccessColor)
+                }, 
+                new RemainingTimeColumn
+                {
+                    Style = new Style(Constants.Colors.MainColor)
+                }, 
+                new SpinnerColumn
+                {
+                    Spinner = Spinner.Known.Aesthetic, 
+                    Style = new Style(foreground: Constants.Colors.MainColor),
+                    CompletedStyle = new Style(Constants.Colors.SuccessColor)
+                }
             )
             .Start(ctx =>
             {
@@ -81,30 +104,34 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
     {
         Guard.Against.Null(_conf);
 
-        var usersProgressTask = ctx.AddTask("Получение пользователей", new ProgressTaskSettings { AutoStart = true, MaxValue = _conf.UserIds.Count });
-        foreach (var userId in _conf.UserIds)
-        {
-            var user = vkService.FetchUserById(long.Parse(userId));
-            if (user is null)
-                continue;
+        var usersProgressTask = ctx
+            .AddTask("[bold]Получение пользователей[/]")
+            .IsIndeterminate();
+        
+        var users = vkService.FetchUsersById(_conf.UserIds.Select(long.Parse)).ToList();
 
-            usersProgressTask.Description = $"Пользователь: ({user.Id} ({user.FirstName} {user.LastName}))";
+        usersProgressTask.IsIndeterminate = false;
+        usersProgressTask.MaxValue = users.Count;
+        
+        foreach (var user in users)
+        {
+            usersProgressTask.Description = $"[bold]Пользователь:[/] [underline]{user.FirstName} {user.LastName} ({user.Id})[/])";
             
             var groupsProgressTask = ctx
-                .AddTask("Получение групп пользователя")
+                .AddTask("[bold]Получение групп пользователя[/]")
                 .IsIndeterminate();
             
-            var groups = vkService.FetchUserGroups(Convert.ToInt64(userId)).ToList();
+            var groups = vkService.FetchUserGroups(Convert.ToInt64(user)).ToList();
             
             groupsProgressTask.IsIndeterminate = false;
             groupsProgressTask.MaxValue = groups.Count;
             
             foreach (var group in groups)
             {
-                groupsProgressTask.Description = $"Группа: ({group.Name})";
+                groupsProgressTask.Description = $"[bold]Группа:[/] [underline]({group.Name})[/]";
                 
                 var postsProgressTask = ctx
-                    .AddTask("Получение постов")
+                    .AddTask("[bold]Получение постов[/]")
                     .IsIndeterminate();
                 
                 var posts = vkService.FetchPostsFromGroup(group.Id, 100)
@@ -116,14 +143,14 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                 
                 foreach (var post in posts)
                 {
-                    postsProgressTask.Description = $"Пост: (PostID = {post.Id})";
+                    postsProgressTask.Description = $"[bold]Пост:[/] [underline]{post.Id}[/]";
                     
                     var likes = vkService.FetchLikesFromPost(group.Id, post.Id).ToList();
-                    foreach (var unused in likes.Where(like => like.Id == Convert.ToInt64(userId)))
+                    foreach (var unused in likes.Where(like => like.Id == Convert.ToInt64(user)))
                     {
                         _outLikes.Add(
                             new LikeModel(
-                                userId, 
+                                user?.Id.ToString() ?? "-1", 
                                 group.Id.ToString(), 
                                 post.Id?.ToString() ?? "-1"
                             )
@@ -135,14 +162,14 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                     var comments = vkService.FetchCommentsFromPost(group.Id, post.Id);
                     foreach (var comment in comments)
                     {
-                        if (comment.FromId != Convert.ToInt64(userId))
+                        if (comment.FromId != Convert.ToInt64(user))
                             continue;
                         
                         _outComments.Add(
                             new CommentModel(
-                                userId, 
+                                user?.Id.ToString() ?? "-1",
                                 group.Id.ToString(), 
-                                post.Id?.ToString() ?? "-1", 
+                                post.Id.ToString() ?? "-1", 
                                 comment.Id.ToString(), 
                                 comment.Text
                             )
@@ -164,50 +191,64 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
     {
         Guard.Against.Null(_conf);
 
-        foreach (var groupId in _conf.GroupIds)
+        var groupsProgressTask = ctx
+            .AddTask("[bold]Получение групп[/]")
+            .IsIndeterminate();
+        
+        var groups = vkService.FetchGroupsInfo(_conf.GroupIds)
+            .Where(group => group.IsClosed is GroupPublicity.Public)
+            .ToList();
+        
+        groupsProgressTask.IsIndeterminate = false;
+        groupsProgressTask.MaxValue = groups.Count;
+        
+        foreach (var group in groups)
         {
-            AnsiConsole.WriteLine($"Group = {groupId}");
+            groupsProgressTask.Description = $"[bold]Группа:[/] [underline]{group.Name}[/]";
             
-            var posts = vkService.FetchPostsFromGroup(long.Parse(groupId));
-            foreach (var post in posts.Where(post => post.Comments.Count > 2 || post.Likes.Count > 0))
+            var postsProgressTask = ctx
+                .AddTask("[bold]Получение постов[/]")
+                .IsIndeterminate();
+            
+            var posts = vkService.FetchPostsFromGroup(group.Id)
+                .Where(post => post.Comments.Count > 2 || post.Likes.Count > 0)
+                .ToList();
+            
+            postsProgressTask.IsIndeterminate = false;
+            postsProgressTask.MaxValue = posts.Count;
+            
+            foreach (var post in posts)
             {
-                var postText = post.Text.Length <= 50 
-                    ? post.Text 
-                    : post.Text[..50];
-                postText = postText.Replace("\n", "");
-                
-                AnsiConsole.WriteLine($"\t\tPost = {post.Id} ({(postText.Equals("") ? post.ToString() : postText)}) (LikesCount = {post.Likes.Count}) (CommentsCount = {post.Comments.Count})");
+                postsProgressTask.Description = $"[bold]Пост:[/] [underline]{post.Id}[/]";
                 
                 /* Лайки */
-                var likes = vkService.FetchLikesFromPost(long.Parse(groupId), post.Id);
+                var likes = vkService.FetchLikesFromPost(group.Id, post.Id);
                 foreach (var like in likes)
                 {
                     foreach (var userId in _conf.UserIds.Where(userId => like.Id == Convert.ToInt64(userId)))
                     {
-                        AnsiConsole.WriteLine($"\t\t\tLike = {like.Id}");
-                        
                         _outLikes.Add(
                             new LikeModel(
                                 userId, 
-                                groupId, 
+                                group.Id.ToString(), 
                                 post.Id?.ToString() ?? "-1"
                             )
                         );
                     }
                 }
                 
+                Thread.Sleep(333);
+                
                 /* Комментарии */
-                var comments = vkService.FetchCommentsFromPost(long.Parse(groupId), post.Id);
+                var comments = vkService.FetchCommentsFromPost(group.Id, post.Id);
                 foreach (var comment in comments)
                 {
                     foreach (var userId in _conf.UserIds.Where(userId => comment.Id == Convert.ToInt64(userId)))
                     {
-                        AnsiConsole.WriteLine($"\t\t\t\tComment = {comment.Id} ({comment.Text})");
-                    
                         _outComments.Add(
                             new CommentModel(
                                 userId, 
-                                groupId, 
+                                group.Id.ToString(), 
                                 post.Id?.ToString() ?? "-1", 
                                 comment.Id.ToString(), 
                                 comment.Text
@@ -217,7 +258,10 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                 }
                 
                 Thread.Sleep(333);
+                postsProgressTask.Increment(1);
             }
+            
+            groupsProgressTask.Increment(1);
         }
     }
 }
