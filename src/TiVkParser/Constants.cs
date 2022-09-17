@@ -13,9 +13,17 @@ public static class Constants
     public static class Titles
     {
         /// <summary>
+        /// *Версия программы* (1.0)
+        /// </summary>
+        public const string Version = "v.1.0";
+        /// <summary>
+        /// *Версия программы с датой* (1.0 (02.09.2022))
+        /// </summary>
+        public const string VersionWithDate = "v.1.0 (02.09.2022)";
+        /// <summary>
         /// *Название программы* (*Версия* (*дата*)) by *Разработчик*
         /// </summary>
-        public const string FullTitle = "TiVkParser (v.1.0 (02.09.2022)) by Timick";
+        public const string FullTitle = $"TiVkParser ({VersionWithDate}) by Timick";
         /// <summary>
         /// *Название программы* by *Разработчик*
         /// </summary>

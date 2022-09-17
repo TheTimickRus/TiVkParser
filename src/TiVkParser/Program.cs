@@ -9,8 +9,8 @@ app.Configure(conf =>
 {
     conf.AddCommand<GroupsCommand>("groups");
     
-    conf.Settings.ApplicationName = "TiVkParser.exe";
-    conf.Settings.ApplicationVersion = "v.1.0 (02.09.2022)";
+    conf.Settings.ApplicationName = $"{Constants.Titles.VeryShortTitle}.exe";
+    conf.Settings.ApplicationVersion = Constants.Titles.VersionWithDate;
     conf.Settings.ExceptionHandler += ex => 
     {
         AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.ErrorColor);

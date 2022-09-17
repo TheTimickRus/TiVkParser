@@ -1,6 +1,6 @@
 namespace TiVkParser.Models;
 
-public record OutputModel(
+public record CommentModel(
     string UserId, 
     string GroupId, 
     string PostId, 

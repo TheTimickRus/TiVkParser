@@ -9,6 +9,7 @@
         <AssemblyVersion>1.0</AssemblyVersion>
         <FileVersion>1.0</FileVersion>
         <NeutralLanguage>ru</NeutralLanguage>
+        <Product>TiVkParser by Timick</Product>
     </PropertyGroup>
 
     <ItemGroup>
