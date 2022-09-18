@@ -65,8 +65,37 @@ public class VkServiceLib
         if (data.TotalCount < 100)
             return data.WallPosts;
         
+        /*
+        var executeCode =
+            $$"""
+                var ownerId = -77229360;
+                var offset = 100;
+                
+                var posts = API.wall.get({"owner_id":ownerId, "offset":offset, "count":100}).items; 
+                
+                var tiPosts = {"ids":posts@.id, "likes":posts@.likes, "comments":posts@.comments};
+                
+                var flag = 1;
+                while (flag <= 24) { 
+                    var newPosts = API.wall.get({"owner_id":ownerId, "offset":offset, "count":100}).items;
+                    tiPosts.ids.push(newPosts@.id);
+                    tiPosts.likes.push(newPosts@.likes);
+                    tiPosts.comments.push(newPosts@.comments);
+                    
+                    offset = offset + 100;
+                    
+                    flag = flag + 1;
+                };
+                
+                return {"posts":tiPosts, "offset":offset};
+            """;
+
+        var response = _api.Execute.Execute(executeCode);
+        var p = FetchPostsExecuteClass.FromJson(response);
+        */
+        
         var offsetData = new List<Post>();
-        var pagination = new OffsetPagination((long)data.TotalCount, 100);
+        var pagination = new OffsetPagination((long)data.TotalCount);
         
         offsetData.AddRange(data.WallPosts);
         pagination.Increment();
@@ -119,7 +148,7 @@ public class VkServiceLib
             return data.Items;
         
         var offsetData = new List<Comment>();
-        var pagination = new OffsetPagination(data.Count, 100);
+        var pagination = new OffsetPagination(data.Count);
         
         offsetData.AddRange(data.Items);
         pagination.Increment();
@@ -168,7 +197,7 @@ public class VkServiceLib
             return data.Users;
         
         var offsetData = new List<User>();
-        var pagination = new OffsetPagination((long)data.TotalCount, 100);
+        var pagination = new OffsetPagination((long)data.TotalCount);
         
         offsetData.AddRange(data.Users);
         pagination.Increment();
@@ -222,7 +251,7 @@ public class VkServiceLib
             return data;
         
         var offsetData = new List<Group>();
-        var pagination = new OffsetPagination(data.Count, 100);
+        var pagination = new OffsetPagination(data.Count);
         
         offsetData.AddRange(data);
         pagination.Increment();

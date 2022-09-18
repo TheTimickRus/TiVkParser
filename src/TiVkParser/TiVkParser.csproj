@@ -10,6 +10,7 @@
         <FileVersion>1.0</FileVersion>
         <NeutralLanguage>ru</NeutralLanguage>
         <Product>TiVkParser by Timick</Product>
+        <LangVersion>preview</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>

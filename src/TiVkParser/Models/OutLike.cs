@@ -1,6 +1,6 @@
 namespace TiVkParser.Models;
 
-public record LikeModel(
+public record OutLike(
     string UserId, 
     string GroupId, 
     string PostId
