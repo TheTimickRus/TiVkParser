@@ -115,8 +115,8 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                     GroupFromConfig(ctx, vkService);
             });
         
-        SaveDataService.LikesToExcel("Output.xlsx", _outLikes);
-        SaveDataService.CommentsToExcel("Output.xlsx", _outComments);
+        SaveDataService.LikesToExcel("TiVkParser.xlsx", _outLikes);
+        SaveDataService.CommentsToExcel("TiVkParser.xlsx", _outComments);
         
         return 0;
     }

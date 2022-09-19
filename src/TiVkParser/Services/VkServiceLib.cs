@@ -95,7 +95,7 @@ public class VkServiceLib
         */
         
         var offsetData = new List<Post>();
-        var pagination = new OffsetPagination((long)data.TotalCount);
+        var pagination = new OffsetPagination((long)data.TotalCount, 100);
         
         offsetData.AddRange(data.WallPosts);
         pagination.Increment();
@@ -114,7 +114,7 @@ public class VkServiceLib
                 .WallPosts
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты постов со стены
             if (pagination.CurrentOffset > _limit)
@@ -123,7 +123,7 @@ public class VkServiceLib
             Thread.Sleep(333);
         }
 
-        Console.Title = Constants.Titles.FullTitle;
+        Console.Title = Constants.Titles.VeryShortTitle;
         return offsetData;
     }
 
@@ -148,7 +148,7 @@ public class VkServiceLib
             return data.Items;
         
         var offsetData = new List<Comment>();
-        var pagination = new OffsetPagination(data.Count);
+        var pagination = new OffsetPagination(data.Count, 100);
         
         offsetData.AddRange(data.Items);
         pagination.Increment();
@@ -168,7 +168,7 @@ public class VkServiceLib
                 .Items
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты постов со стены
             if (pagination.CurrentOffset > _limit)
@@ -177,7 +177,7 @@ public class VkServiceLib
             Thread.Sleep(333);
         }
         
-        Console.Title = Constants.Titles.FullTitle;
+        Console.Title = Constants.Titles.VeryShortTitle;
         return offsetData;
     }
 
@@ -197,7 +197,7 @@ public class VkServiceLib
             return data.Users;
         
         var offsetData = new List<User>();
-        var pagination = new OffsetPagination((long)data.TotalCount);
+        var pagination = new OffsetPagination((long)data.TotalCount, 100);
         
         offsetData.AddRange(data.Users);
         pagination.Increment();
@@ -218,7 +218,7 @@ public class VkServiceLib
                 .Users
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты постов со стены
             if (pagination.CurrentOffset > _limit)
@@ -227,7 +227,7 @@ public class VkServiceLib
             Thread.Sleep(333);
         }
         
-        Console.Title = Constants.Titles.FullTitle;
+        Console.Title = Constants.Titles.VeryShortTitle;
         return offsetData;
     }
 
@@ -251,7 +251,7 @@ public class VkServiceLib
             return data;
         
         var offsetData = new List<Group>();
-        var pagination = new OffsetPagination(data.Count);
+        var pagination = new OffsetPagination(data.Count, 100);
         
         offsetData.AddRange(data);
         pagination.Increment();
@@ -270,7 +270,7 @@ public class VkServiceLib
                 )
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.FullTitle} | Offset = {pagination.CurrentOffset}";
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты постов со стены
             if (pagination.CurrentOffset > _limit)
@@ -279,7 +279,7 @@ public class VkServiceLib
             Thread.Sleep(333);
         }
         
-        Console.Title = Constants.Titles.FullTitle;
+        Console.Title = Constants.Titles.VeryShortTitle;
         return offsetData;
     }
 
