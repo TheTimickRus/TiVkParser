@@ -24,15 +24,6 @@ public class OffsetPagination
     private readonly long _offsetLenght;
     
     /// <summary>
-    /// Конструктор с параметрами #1
-    /// </summary>
-    /// <param name="offsetLenght"></param>
-    public OffsetPagination(long offsetLenght = 100)
-    {
-        _offsetLenght = offsetLenght;
-    }
-
-    /// <summary>
     /// Конструктор с параметрами #2
     /// </summary>
     /// <param name="totalCount">Всего объектов</param>
