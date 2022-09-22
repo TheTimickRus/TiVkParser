@@ -14,6 +14,7 @@ using TiVkParser.Models.SaveDataModels;
 using TiVkParser.Services;
 using Tomlyn;
 using VkNet.Enums;
+using VkNet.Model.Attachments;
 
 namespace TiVkParser.Commands;
 
@@ -26,6 +27,11 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         [DefaultValue("TiVkParser.toml")]
         public string? ConfigFile { get; init; }
 
+        [Description("Временная граница для получаемых постов. Задается в формате dd:mm:yy (Default = null)")]
+        [CommandOption("-d|--date")]
+        [DefaultValue(null)]
+        public string? PostDate { get; set; }
+        
         [Description("Общий лимит кол-ва получаемых объектов для всех запросов (Default = 1000)")]
         [CommandOption("-l|--limit")]
         [DefaultValue((long)1000)]
@@ -168,7 +174,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                     .AddTask("[bold]Получение постов[/]")
                     .IsIndeterminate();
                 
-                var posts = vkService.FetchPostsFromGroup(group.Id)
+                var posts = vkService.FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(10000, DateTime.Parse(_settings.PostDate)))
                     .Where(post => post.Comments.Count > 2 || post.Likes.Count > 0)
                     .ToList();
 
@@ -260,9 +266,15 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                 .AddTask($"[bold {Constants.Colors.SecondColor}]Получение постов[/]")
                 .IsIndeterminate();
             
-            var posts = vkService.FetchPostsFromGroup(group.Id)
-                .Where(post => post.Comments.Count > 0 || post.Likes.Count > 0)
+            var posts = vkService
+                .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(_settings.Limit, _settings.PostDate is not null ? DateTime.Parse(_settings.PostDate) : null))
                 .ToList();
+
+            if (_settings.PostDate is not null)
+                posts = posts.Where(post => post.Date > DateTime.Parse(_settings.PostDate)).ToList();
+            
+            if (posts.Count is 0)
+                continue;
             
             postsProgressTask.IsIndeterminate = false;
             postsProgressTask.MaxValue = posts.Count;
@@ -271,7 +283,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
             {
                 postsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}]Пост:[/] [underline]{post.Id}[/]";
 
-                if (_settings.IsLike)
+                if (_settings.IsLike && post.Likes.Count > 0)
                 {
                     var likes = vkService.FetchLikesFromPost(group.Id, post.Id);
                     foreach (var like in likes)
@@ -293,7 +305,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                     //Thread.Sleep(333);
                 }
 
-                if (_settings.IsComments)
+                if (_settings.IsComments && post.Comments.Count > 0)
                 {
                     var comments = vkService.FetchCommentsFromPost(group.Id, post.Id);
                     foreach (var comment in comments)
@@ -310,7 +322,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                                 )
                             );
                             
-                            SerilogLib.Info($"Comment = ({userId},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()},{comment.Text})");
+                            SerilogLib.Info($"Comment = ({userId},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()})");
                         }
                     }
                 

@@ -37,8 +37,14 @@ public class OffsetPagination
     /// <summary>
     /// Метод для увеличения Offset. Вызывать в теле цикла, после выполнения API запроса
     /// </summary>
-    public void Increment()
+    public void Increment(long? offset = null)
     {
-        CurrentOffset += _offsetLenght;
+        if (offset is null)
+        {
+            CurrentOffset += _offsetLenght;
+            return;
+        }
+        
+        CurrentOffset += offset.Value;
     }
 }
