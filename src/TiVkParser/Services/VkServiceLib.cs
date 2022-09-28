@@ -64,7 +64,7 @@ public class VkServiceLib
     /// <returns>Посты сообщества</returns>
     public IEnumerable<Post> FetchPostsFromGroup(long ownerId, FetchPostsFilterParams filterParams)
     {
-        static PostsExecuteResponse Execute(IVkApi api, long ownerId, long offset)
+        static PostsExecuteResponse Execute(IVkApiCategories api, long ownerId, long offset)
         {
             const string executeCode = 
                 $$"""
