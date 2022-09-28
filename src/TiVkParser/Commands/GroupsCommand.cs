@@ -10,9 +10,11 @@ using Spectre.Console.Cli;
 using TiVkParser.Helpers;
 using TiVkParser.Models;
 using TiVkParser.Models.ConfModels;
+using TiVkParser.Models.SaveDataModels;
 using TiVkParser.Services;
 using Tomlyn;
 using VkNet.Enums;
+using VkNet.Model.Attachments;
 
 namespace TiVkParser.Commands;
 
@@ -25,6 +27,11 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         [DefaultValue("TiVkParser.toml")]
         public string? ConfigFile { get; init; }
 
+        [Description("Временная граница для получаемых постов. Задается в формате dd:mm:yy (Default = null)")]
+        [CommandOption("-d|--date")]
+        [DefaultValue(null)]
+        public string? PostDate { get; set; }
+        
         [Description("Общий лимит кол-ва получаемых объектов для всех запросов (Default = 1000)")]
         [CommandOption("-l|--limit")]
         [DefaultValue((long)1000)]
@@ -32,12 +39,12 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         
         [Description("Поиск по лайкам")]
         [CommandOption("--likes")]
-        [DefaultValue(true)]
+        [DefaultValue(false)]
         public bool IsLike { get; init; }
         
         [Description("Поиск по комментариям")]
         [CommandOption("--comments")]
-        [DefaultValue(true)]
+        [DefaultValue(false)]
         public bool IsComments { get; init; }
     }
     
@@ -62,6 +69,9 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
             throw new Exception("Не найден файл конфигурации! Стандартный файл конфигурации создан - TiVkParser.toml. Заполните его и перезапустите программу...");
         }
         
+        if (!settings.IsLike && !settings.IsComments)
+            throw new Exception("Вы не выбрали что искать. Установить соответствующие параметры для поиска лайков или комментариев");
+        
         var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(settings.ConfigFile));
         _accessToken = mainConf.AccessToken ?? "";
         _conf = mainConf.Groups;
@@ -73,8 +83,9 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
     {
         _settings = settings;
         Guard.Against.Null(_conf);
-
+        
         SerilogLib.IsLogging = true;
+        Console.Title = Constants.Titles.VeryShortTitle;
         
         AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
         AnsiConsoleLib.ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
@@ -113,6 +124,8 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                     GroupsFromUser(ctx, vkService);
                 else
                     GroupFromConfig(ctx, vkService);
+                
+                return Task.CompletedTask;
             });
         
         SaveDataService.LikesToExcel("TiVkParser.xlsx", _outLikes);
@@ -132,7 +145,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         Guard.Against.Null(_conf);
 
         var usersProgressTask = ctx
-            .AddTask("[bold]Получение пользователей[/]")
+            .AddTask($"[bold]Получение пользователей[/][/]")
             .IsIndeterminate();
         
         var users = vkService.FetchUsersById(_conf.UserIds.Select(long.Parse)).ToList();
@@ -161,7 +174,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                     .AddTask("[bold]Получение постов[/]")
                     .IsIndeterminate();
                 
-                var posts = vkService.FetchPostsFromGroup(group.Id, 100)
+                var posts = vkService.FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(10000, DateTime.Parse(_settings.PostDate)))
                     .Where(post => post.Comments.Count > 2 || post.Likes.Count > 0)
                     .ToList();
 
@@ -235,7 +248,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         Guard.Against.Zero(_conf.GroupIds.Count);
         
         var groupsProgressTask = ctx
-            .AddTask("[bold]Получение групп[/]")
+            .AddTask($"[bold {Constants.Colors.SecondColor}]Получение групп[/]")
             .IsIndeterminate();
         
         var groups = vkService.FetchGroupsInfo(_conf.GroupIds)
@@ -247,24 +260,30 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         
         foreach (var group in groups)
         {
-            groupsProgressTask.Description = $"[bold]Группа:[/] [underline]{group.Name}[/]";
+            groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name}[/]";
             
             var postsProgressTask = ctx
-                .AddTask("[bold]Получение постов[/]")
+                .AddTask($"[bold {Constants.Colors.SecondColor}]Получение постов[/]")
                 .IsIndeterminate();
             
-            var posts = vkService.FetchPostsFromGroup(group.Id)
-                .Where(post => post.Comments.Count > 0 || post.Likes.Count > 0)
+            var posts = vkService
+                .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(_settings.Limit, _settings.PostDate is not null ? DateTime.Parse(_settings.PostDate) : null))
                 .ToList();
+
+            if (_settings.PostDate is not null)
+                posts = posts.Where(post => post.Date > DateTime.Parse(_settings.PostDate)).ToList();
+            
+            if (posts.Count is 0)
+                continue;
             
             postsProgressTask.IsIndeterminate = false;
             postsProgressTask.MaxValue = posts.Count;
             
             foreach (var post in posts)
             {
-                postsProgressTask.Description = $"[bold]Пост:[/] [underline]{post.Id}[/]";
+                postsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}]Пост:[/] [underline]{post.Id}[/]";
 
-                if (_settings.IsLike)
+                if (_settings.IsLike && post.Likes.Count > 0)
                 {
                     var likes = vkService.FetchLikesFromPost(group.Id, post.Id);
                     foreach (var like in likes)
@@ -279,19 +298,19 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                                 )
                             );
                             
-                            SerilogLib.Info($"{userId},{group.Id.ToString()},{post.Id.ToString()}");
+                            SerilogLib.Info($"Like = ({userId},{group.Id.ToString()},{post.Id.ToString()})");
                         }
                     }  
                     
-                    Thread.Sleep(333);
+                    //Thread.Sleep(333);
                 }
 
-                if (_settings.IsComments)
+                if (_settings.IsComments && post.Comments.Count > 0)
                 {
                     var comments = vkService.FetchCommentsFromPost(group.Id, post.Id);
                     foreach (var comment in comments)
                     {
-                        foreach (var userId in _conf.UserIds.Where(userId => comment.Id == Convert.ToInt64(userId)))
+                        foreach (var userId in _conf.UserIds.Where(userId => comment.FromId == Convert.ToInt64(userId)))
                         {
                             _outComments.Add(
                                 new OutComment(
@@ -303,7 +322,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                                 )
                             );
                             
-                            SerilogLib.Info($"{userId},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()},{comment.Text}");
+                            SerilogLib.Info($"Comment = ({userId},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()})");
                         }
                     }
                 

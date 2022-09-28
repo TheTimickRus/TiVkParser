@@ -1,4 +1,4 @@
-namespace TiVkParser.Models;
+namespace TiVkParser.Models.SaveDataModels;
 
 public record OutComment(
     string UserId, 
