@@ -1,4 +1,6 @@
 ﻿using TiVkParser.Helpers;
+using TiVkParser.Models;
+using TiVkParser.Models.ExecuteModels;
 using VkNet;
 using VkNet.Abstractions;
 using VkNet.Enums.Filters;
@@ -6,22 +8,29 @@ using VkNet.Enums.SafetyEnums;
 using VkNet.Model;
 using VkNet.Model.Attachments;
 using VkNet.Model.RequestParams;
+using VkNet.Utils;
 
 namespace TiVkParser.Services;
 
+/// <summary>
+/// Надстройка над сервисом VK.NET
+/// </summary>
 public class VkServiceLib
 {
-    public bool IsAuth { get; set; }
-
     private readonly IVkApi _api = new VkApi();
-    private readonly long _limit;
+    private readonly long _totalCount;
 
-    public VkServiceLib(string accessToken, long limit)
+    /// <summary>
+    /// Конструктор с параметрами
+    /// </summary>
+    /// <param name="accessToken">Токен доступа</param>
+    /// <param name="totalCount">Максимальное кол-во элементов, получаемых в методах</param>
+    public VkServiceLib(string accessToken, long totalCount)
     {
         _api.Authorize(new ApiAuthParams { AccessToken = accessToken });
         _api.Account.GetProfileInfo();
         
-        _limit = limit;
+        _totalCount = totalCount;
     }
 
     /// <summary>
@@ -51,10 +60,43 @@ public class VkServiceLib
     /// Получение постов из группы
     /// </summary>
     /// <param name="ownerId">ID сообщества</param>
-    /// <param name="count">Кол-во постов</param>
-    /// <returns>Сообщество, Посты сообщества</returns>
-    public IEnumerable<Post> FetchPostsFromGroup(long ownerId, int count = -1)
+    /// <param name="filterParams"></param>
+    /// <returns>Посты сообщества</returns>
+    public IEnumerable<Post> FetchPostsFromGroup(long ownerId, FetchPostsFilterParams filterParams)
     {
+        static PostsExecuteResponse Execute(IVkApi api, long ownerId, long offset)
+        {
+            const string executeCode = 
+                $$"""
+                    var ownerId = parseInt(Args.ownerId);
+                    var offset = parseInt(Args.offset);
+                              
+                    var tiPosts = { "ids" : [], "likes" : [], "comments" : [], "date": [] };
+
+                    var flag = 0;
+                    while (flag <= 24) { 
+                        var posts = API.wall.get({"owner_id":ownerId, "offset":offset, "count":100}).items;
+                        tiPosts.ids.push(posts@.id);
+                        tiPosts.likes.push(posts@.likes);
+                        tiPosts.comments.push(posts@.comments);
+                        tiPosts.date.push(posts@.date);
+
+                        offset = offset + 100; 
+                        flag = flag + 1;
+                    };
+
+                    return {"posts" : tiPosts, "offset" : offset};
+                """ ;
+
+            var vkArgs = new VkParameters
+            {
+                { "ownerId", ownerId },
+                { "offset", offset }
+            };
+
+            return api.Execute.Execute<PostsExecuteResponse>(executeCode, vkArgs);
+        }
+        
         var data = _api.Wall.Get(
             new WallGetParams { 
                 OwnerId = -ownerId,
@@ -65,68 +107,99 @@ public class VkServiceLib
         if (data.TotalCount < 100)
             return data.WallPosts;
         
-        /*
-        var executeCode =
-            $$"""
-                var ownerId = -77229360;
-                var offset = 100;
+        var allItems = new List<Post>(data.WallPosts);
+        var pagination = new OffsetPagination((long)data.TotalCount);
+        pagination.Increment(100);
+        Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
+        
+        while (pagination.IsNotFinal)
+        {
+            var response = Execute(_api, -ownerId, pagination.CurrentOffset);
+            
+            for (var i = 0; i < response.Posts.Ids?.Count; i++)
+            {
+                for (var j = 0; j < response.Posts.Ids?[i].Count; j++)
+                {
+                    var post = new Post
+                    {
+                        Id = response.Posts.Ids[i][j],
+                        Likes = response.Posts.Likes?[i][j],
+                        Comments = response.Posts.Comments?[i][j],
+                        Date = DateTimeOffset.FromUnixTimeSeconds(response.Posts.Dates?[i][j] ?? 0).DateTime
+                    };
                 
-                var posts = API.wall.get({"owner_id":ownerId, "offset":offset, "count":100}).items; 
-                
-                var tiPosts = {"ids":posts@.id, "likes":posts@.likes, "comments":posts@.comments};
-                
-                var flag = 1;
-                while (flag <= 24) { 
-                    var newPosts = API.wall.get({"owner_id":ownerId, "offset":offset, "count":100}).items;
-                    tiPosts.ids.push(newPosts@.id);
-                    tiPosts.likes.push(newPosts@.likes);
-                    tiPosts.comments.push(newPosts@.comments);
-                    
-                    offset = offset + 100;
-                    
-                    flag = flag + 1;
-                };
-                
-                return {"posts":tiPosts, "offset":offset};
-            """;
+                    allItems.Add(post);
+                }
+            }
+            
+            pagination.Increment(2500);
+            
+            if (allItems.Count >= filterParams.TotalLimit)
+                break;
+            
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
+        }
 
-        var response = _api.Execute.Execute(executeCode);
-        var p = FetchPostsExecuteClass.FromJson(response);
-        */
+        Console.Title = $"{Constants.Titles.VeryShortTitle}";
+        return allItems;
+    }
+
+    /// <summary>
+    /// Получение лайков под постом
+    /// </summary>
+    /// <param name="groupId">ID группы</param>
+    /// <param name="postId">ID поста</param>
+    /// <returns>Пользователи</returns>
+    public IEnumerable<User> FetchLikesFromPost(long groupId, long? postId)
+    {
+        var data = _api.Likes.GetListEx(
+            new LikesGetListParams
+            {
+                Count = 100,
+                Type = LikeObjectType.Post,
+                ItemId = postId ?? 0,
+                OwnerId = groupId > 0 ? -groupId : groupId
+            }
+        );
+
+        if (data.TotalCount < 100)
+            return data.Users;
         
-        var offsetData = new List<Post>();
-        var pagination = new OffsetPagination((long)data.TotalCount, 100);
+        var allItems = new List<User>();
+        var pagination = new OffsetPagination((long)data.TotalCount);
         
-        offsetData.AddRange(data.WallPosts);
+        allItems.AddRange(data.Users);
         pagination.Increment();
         
         while (pagination.IsNotFinal)
         {
-            offsetData.AddRange(
-                _api.Wall.Get(
-                    new WallGetParams
+            allItems.AddRange(
+                _api.Likes.GetListEx(
+                    new LikesGetListParams
                     {
-                        Count = 100, 
-                        Offset = (ulong)pagination.CurrentOffset, 
-                        OwnerId = -ownerId
+                        Count = 100,
+                        Type = LikeObjectType.Post,
+                        ItemId = postId ?? 0,
+                        OwnerId = groupId > 0 ? -groupId : groupId,
+                        Offset = (uint?)pagination.CurrentOffset
                     }
                 )
-                .WallPosts
+                .Users
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | CurrentOffset = {pagination.CurrentOffset}";
             
-            // Временное решение, чтобы не получать миллиарты постов со стены
-            if (pagination.CurrentOffset > _limit)
+            // Временное решение, чтобы не получать миллиарты значений
+            if (pagination.CurrentOffset > _totalCount)
                 break;
-            
+
             Thread.Sleep(333);
         }
-
+        
         Console.Title = Constants.Titles.VeryShortTitle;
-        return offsetData;
+        return allItems;
     }
-
+    
     /// <summary>
     /// Получение комментариев под постом
     /// </summary>
@@ -147,15 +220,15 @@ public class VkServiceLib
         if (data.Count < 100)
             return data.Items;
         
-        var offsetData = new List<Comment>();
-        var pagination = new OffsetPagination(data.Count, 100);
+        var allItems = new List<Comment>();
+        var pagination = new OffsetPagination(data.Count);
         
-        offsetData.AddRange(data.Items);
+        allItems.AddRange(data.Items);
         pagination.Increment();
         
         while (pagination.IsNotFinal)
         {
-            offsetData.AddRange(
+            allItems.AddRange(
                 _api.Wall.GetComments(
                     new WallGetCommentsParams
                     {
@@ -168,69 +241,19 @@ public class VkServiceLib
                 .Items
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
+            Console.Title = $"{Constants.Titles.VeryShortTitle} | CurrentOffset = {pagination.CurrentOffset}";
             
-            // Временное решение, чтобы не получать миллиарты постов со стены
-            if (pagination.CurrentOffset > _limit)
+            // Временное решение, чтобы не получать миллиарты значений
+            if (pagination.CurrentOffset > _totalCount)
                 break;
             
             Thread.Sleep(333);
         }
         
         Console.Title = Constants.Titles.VeryShortTitle;
-        return offsetData;
+        return allItems;
     }
-
-    public IEnumerable<User> FetchLikesFromPost(long groupId, long? postId)
-    {
-        var data = _api.Likes.GetListEx(
-            new LikesGetListParams
-            {
-                Count = 100,
-                Type = LikeObjectType.Post,
-                ItemId = postId ?? 0,
-                OwnerId = groupId > 0 ? -groupId : groupId
-            }
-        );
-
-        if (data.TotalCount < 100)
-            return data.Users;
-        
-        var offsetData = new List<User>();
-        var pagination = new OffsetPagination((long)data.TotalCount, 100);
-        
-        offsetData.AddRange(data.Users);
-        pagination.Increment();
-        
-        while (pagination.IsNotFinal)
-        {
-            offsetData.AddRange(
-                _api.Likes.GetListEx(
-                    new LikesGetListParams
-                    {
-                        Count = 100,
-                        Type = LikeObjectType.Post,
-                        ItemId = postId ?? 0,
-                        OwnerId = groupId > 0 ? -groupId : groupId,
-                        Offset = (uint?)pagination.CurrentOffset
-                    }
-                )
-                .Users
-            );
-            pagination.Increment();
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
-            
-            // Временное решение, чтобы не получать миллиарты постов со стены
-            if (pagination.CurrentOffset > _limit)
-                break;
-
-            Thread.Sleep(333);
-        }
-        
-        Console.Title = Constants.Titles.VeryShortTitle;
-        return offsetData;
-    }
-
+    
     /// <summary>
     /// Получение списка сообществ пользователя
     /// </summary>
@@ -250,15 +273,15 @@ public class VkServiceLib
         if (data.Count < 100)
             return data;
         
-        var offsetData = new List<Group>();
-        var pagination = new OffsetPagination(data.Count, 100);
+        var allItems = new List<Group>();
+        var pagination = new OffsetPagination(data.Count);
         
-        offsetData.AddRange(data);
+        allItems.AddRange(data);
         pagination.Increment();
         
         while (pagination.IsNotFinal)
         {
-            offsetData.AddRange(
+            allItems.AddRange(
                 _api.Groups.Get(
                     new GroupsGetParams
                     {
@@ -272,15 +295,15 @@ public class VkServiceLib
             pagination.Increment();
             Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
             
-            // Временное решение, чтобы не получать миллиарты постов со стены
-            if (pagination.CurrentOffset > _limit)
+            // Временное решение, чтобы не получать миллиарты значений
+            if (pagination.CurrentOffset > _totalCount)
                 break;
 
             Thread.Sleep(333);
         }
         
         Console.Title = Constants.Titles.VeryShortTitle;
-        return offsetData;
+        return allItems;
     }
 
     /// <summary>
@@ -296,28 +319,24 @@ public class VkServiceLib
         }
         catch
         {
-            // ignore
+            return null;
         }
-
-        return null;
     }
 
     /// <summary>
     /// Получение пользователей по IDs
     /// </summary>
-    /// <param name="ids">ID пользователей</param>
+    /// <param name="userIds">ID пользователей</param>
     /// <returns>Пользователи</returns>
-    public IEnumerable<User> FetchUsersById(IEnumerable<long> ids)
+    public IEnumerable<User> FetchUsersById(IEnumerable<long> userIds)
     {
         try
         {
-            return _api.Users.Get(ids);
+            return _api.Users.Get(userIds);
         }
         catch
         {
-            // ignore
+            return new List<User>();
         }
-
-        return new List<User>();
     }
 }
