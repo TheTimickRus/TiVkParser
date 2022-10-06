@@ -14,7 +14,6 @@ using TiVkParser.Models.SaveDataModels;
 using TiVkParser.Services;
 using Tomlyn;
 using VkNet.Enums;
-using VkNet.Model.Attachments;
 
 namespace TiVkParser.Commands;
 
@@ -30,12 +29,12 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         [Description("Временная граница для получаемых постов. Задается в формате dd:mm:yy (Default = null)")]
         [CommandOption("-d|--date")]
         [DefaultValue(null)]
-        public string? PostDate { get; set; }
+        public string? DateFilter { get; init; }
         
         [Description("Общий лимит кол-ва получаемых объектов для всех запросов (Default = 1000)")]
         [CommandOption("-l|--limit")]
         [DefaultValue((long)1000)]
-        public long Limit { get; init; }
+        public long LimitFilter { get; init; }
         
         [Description("Поиск по лайкам")]
         [CommandOption("--likes")]
@@ -90,7 +89,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
         AnsiConsoleLib.ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
         
-        var vkService = new VkServiceLib(_accessToken, settings.Limit);
+        var vkService = new VkServiceLib(_accessToken, settings.LimitFilter);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
@@ -145,50 +144,60 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         Guard.Against.Null(_conf);
 
         var usersProgressTask = ctx
-            .AddTask($"[bold]Получение пользователей[/][/]")
+            .AddTask("[bold]Получение пользователей[/][/]")
             .IsIndeterminate();
         
-        var users = vkService.FetchUsersById(_conf.UserIds.Select(long.Parse)).ToList();
+        var users = vkService
+            .FetchUsersById(_conf.UserIds.Select(long.Parse))
+            .ToList();
 
         usersProgressTask.IsIndeterminate = false;
         usersProgressTask.MaxValue = users.Count;
         
+        // Обработка пользователей
         foreach (var user in users)
         {
-            usersProgressTask.Description = $"[bold]Пользователь:[/] [underline]{user.FirstName} {user.LastName} ({user.Id})[/])";
+            usersProgressTask.Description = $"[bold]Пользователь:[/] [underline]{user.FirstName} {user.LastName} ({user.Id})[/]";
             
             var groupsProgressTask = ctx
                 .AddTask("[bold]Получение групп пользователя[/]")
                 .IsIndeterminate();
             
-            var groups = vkService.FetchUserGroups(Convert.ToInt64(user.Id)).ToList();
+            var groups = vkService
+                .FetchUserGroups(Convert.ToInt64(user.Id))
+                .ToList();
             
             groupsProgressTask.IsIndeterminate = false;
             groupsProgressTask.MaxValue = groups.Count;
             
+            // Обработка групп пользователя
             foreach (var group in groups)
             {
-                groupsProgressTask.Description = $"[bold]Группа:[/] [underline]({group.Name})[/]";
+                groupsProgressTask.Description = $"[bold]Группа:[/] [underline]{group.Name}[/]";
                 
                 var postsProgressTask = ctx
                     .AddTask("[bold]Получение постов[/]")
                     .IsIndeterminate();
-                
-                var posts = vkService.FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(10000, DateTime.Parse(_settings.PostDate)))
-                    .Where(post => post.Comments.Count > 2 || post.Likes.Count > 0)
+
+                var dateParseResult = DateTime.TryParse(_settings.DateFilter, out var dateFilter);
+                var posts = vkService
+                    .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(10000, dateParseResult ? dateFilter : null))
+                    .Where(post => _settings.IsComments && post.Comments.Count > 0 || _settings.IsLike && post.Likes.Count > 0)
                     .ToList();
 
                 postsProgressTask.IsIndeterminate = false;
                 postsProgressTask.MaxValue = posts.Count;
                 
+                // Обработка постов из группы
                 foreach (var post in posts)
                 {
                     postsProgressTask.Description = $"[bold]Пост:[/] [underline]{post.Id}[/]";
 
                     if (_settings.IsLike)
                     {
-                        var likes = vkService.FetchLikesFromPost(group.Id, post.Id).ToList();
-                        foreach (var unused in likes.Where(like => like.Id == Convert.ToInt64(user?.Id)))
+                        var likes = vkService
+                            .FetchLikesFromPost(group.Id, post.Id);
+                        foreach (var unused in likes.Where(like => like.Id == user?.Id))
                         {
                             _outLikes.Add(
                                 new OutLike(
@@ -206,7 +215,8 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
 
                     if (_settings.IsComments)
                     {
-                        var comments = vkService.FetchCommentsFromPost(group.Id, post.Id);
+                        var comments = vkService
+                            .FetchCommentsFromPost(group.Id, post.Id);
                         foreach (var comment in comments.Where(comment => comment.FromId == user?.Id))
                         {
                             _outComments.Add(
@@ -266,12 +276,10 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                 .AddTask($"[bold {Constants.Colors.SecondColor}]Получение постов[/]")
                 .IsIndeterminate();
             
+            var dateParseResult = DateTime.TryParse(_settings.DateFilter, out var dateFilter);
             var posts = vkService
-                .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(_settings.Limit, _settings.PostDate is not null ? DateTime.Parse(_settings.PostDate) : null))
+                .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(_settings.LimitFilter, dateParseResult ? dateFilter : null))
                 .ToList();
-
-            if (_settings.PostDate is not null)
-                posts = posts.Where(post => post.Date > DateTime.Parse(_settings.PostDate)).ToList();
             
             if (posts.Count is 0)
                 continue;

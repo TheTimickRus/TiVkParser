@@ -1,5 +1,4 @@
 using OfficeOpenXml;
-using TiVkParser.Models;
 using TiVkParser.Models.SaveDataModels;
 
 namespace TiVkParser.Services;
@@ -22,6 +21,16 @@ public static class SaveDataService
         var package = new ExcelPackage(new FileInfo(fileName));
         var sheet = package.Workbook.Worksheets
             .Add("Comments");
+        sheet.Cells["A1"].LoadFromCollection(data, true);
+        package.Save();
+    }
+    
+    public static void FriendsToExcel(string fileName, List<long> data)
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        var package = new ExcelPackage(new FileInfo(fileName));
+        var sheet = package.Workbook.Worksheets
+            .Add("Friends");
         sheet.Cells["A1"].LoadFromCollection(data, true);
         package.Save();
     }
