@@ -339,4 +339,37 @@ public class VkServiceLib
             return new List<User>();
         }
     }
+
+    /// <summary>
+    /// Получает список друзей пользователя
+    /// </summary>
+    /// <param name="userId">ID пользователя</param>
+    /// <returns>Список ID</returns>
+    public IEnumerable<long> FetchFriendsFromUser(long userId)
+    {
+        try
+        {
+            var allFriends = new List<long>();
+            
+            var chunkFriends = _api.Friends.Get(new FriendsGetParams { UserId = userId, Count = 100 });
+            allFriends.AddRange(chunkFriends.Select(user => user.Id));
+            
+            var pagination = new OffsetPagination((long) chunkFriends.TotalCount);
+            pagination.Increment(100);
+            
+            while (pagination.IsNotFinal)
+            {
+                chunkFriends = _api.Friends.Get(new FriendsGetParams { UserId = userId, Count = 100, Offset = pagination.CurrentOffset });
+                allFriends.AddRange(chunkFriends.Select(user => user.Id));
+                
+                pagination.Increment(100);
+            }
+
+            return allFriends;
+        }
+        catch
+        {
+            return new List<long>();
+        }
+    }
 }

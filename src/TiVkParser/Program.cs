@@ -8,6 +8,7 @@ var app = new CommandApp();
 app.Configure(conf =>
 {
     conf.AddCommand<GroupsCommand>("groups");
+    conf.AddCommand<FriendsCommand>("friends");
     
     conf.Settings.ApplicationName = $"{Constants.Titles.VeryShortTitle}.exe";
     conf.Settings.ApplicationVersion = Constants.Titles.VersionWithDate;
