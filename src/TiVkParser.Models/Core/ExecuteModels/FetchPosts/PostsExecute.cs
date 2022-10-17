@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using Newtonsoft.Json;
 using VkNet.Model;
 
-namespace TiVkParser.Models.ExecuteModels.FetchPosts;
+namespace TiVkParser.Models.Core.ExecuteModels.FetchPosts;
 
 [Serializable]
 public class PostsExecute

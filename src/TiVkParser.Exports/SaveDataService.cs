@@ -1,5 +1,5 @@
 using OfficeOpenXml;
-using TiVkParser.Models.SaveDataModels;
+using TiVkParser.Models.Exports;
 
 namespace TiVkParser.Exports;
 

@@ -1,4 +1,5 @@
 // ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 
 namespace TiVkParser.Core.Helpers;
 
@@ -10,17 +11,17 @@ public class OffsetPagination
     /// <summary>
     /// Общее количество элементов
     /// </summary>
-    public ulong TotalCount { get; set; }
+    public long TotalCount { get; set; }
     
     /// <summary>
     /// Текущий Offset. Передавать в API запрос
     /// </summary>
-    public ulong CurrentOffset { get; private set; }
+    public long CurrentOffset { get; private set; }
     
     /// <summary>
     /// Величина, на которую необходимо смещать значение пагинации
     /// </summary>
-    public ulong OffsetLenght { get; set; }
+    public long OffsetLenght { get; set; }
     
     /// <summary>
     /// Признак окончания работы пагинации. Передавать в условие цикла
@@ -33,7 +34,7 @@ public class OffsetPagination
     /// <param name="totalCount">Всего объектов</param>
     /// <param name="offsetStart">С какого значения начинать пагинацию. По умолчанию - 0</param>
     /// <param name="offsetLenght">Величина смещения. По умолчанию - 100</param>
-    public OffsetPagination(ulong totalCount, ulong offsetStart = 0, ulong offsetLenght = 100)
+    public OffsetPagination(long totalCount, long offsetStart = 0, long offsetLenght = 100)
     {
         TotalCount = totalCount;
         CurrentOffset = offsetStart;
@@ -43,14 +44,15 @@ public class OffsetPagination
     /// <summary>
     /// Метод для увеличения Offset. Вызывать в теле цикла, после выполнения API запроса
     /// </summary>
-    public void Increment(ulong? manualOffsetForCurrentIteration = null)
+    /// <param name="manualOffset">Смещение, отличное от OffsetLenght</param>
+    public void Increment(long? manualOffset = null)
     {
-        if (manualOffsetForCurrentIteration is null)
+        if (manualOffset is null)
         {
             CurrentOffset += OffsetLenght;
             return;
         }
         
-        CurrentOffset += manualOffsetForCurrentIteration.Value;
+        CurrentOffset += manualOffset.Value;
     }
 }

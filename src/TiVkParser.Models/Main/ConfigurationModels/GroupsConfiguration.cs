@@ -2,7 +2,7 @@
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable ClassNeverInstantiated.Global
 
-namespace TiVkParser.Models.ConfigurationModels;
+namespace TiVkParser.Models.Main.ConfigurationModels;
 
 public record GroupsConfiguration
 {

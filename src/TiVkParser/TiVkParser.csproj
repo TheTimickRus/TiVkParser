@@ -35,8 +35,4 @@
       <ProjectReference Include="..\TiVkParser.Logging\TiVkParser.Logging.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Models" />
-    </ItemGroup>
-
 </Project>

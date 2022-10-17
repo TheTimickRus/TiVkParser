@@ -1,4 +1,4 @@
-namespace TiVkParser.Models.Filters;
+namespace TiVkParser.Models.Core.Filters;
 
 public record FetchPostsFilter(
     long? TotalLimit, 

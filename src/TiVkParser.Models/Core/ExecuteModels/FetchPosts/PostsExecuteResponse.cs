@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace TiVkParser.Models.ExecuteModels.FetchPosts;
+namespace TiVkParser.Models.Core.ExecuteModels.FetchPosts;
 
 [Serializable]
 public class PostsExecuteResponse

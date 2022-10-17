@@ -10,7 +10,7 @@ using TiVkParser.Core;
 using TiVkParser.Exports;
 using TiVkParser.Helpers;
 using TiVkParser.Logging;
-using TiVkParser.Models.ConfigurationModels;
+using TiVkParser.Models.Main.ConfigurationModels;
 using TiVkParser.Services;
 using Tomlyn;
 using VkNet.Model;
@@ -67,7 +67,7 @@ public class FriendsCommand : Command<FriendsSettings>
         /* Подготовка */
         SerilogLib.IsLogging = settings.IsLogging;
         Guard.Against.Null(_conf);
-        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, (ulong)settings.TotalItemsForApi);
+        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.TotalItemsForApi);
         AnsiConsoleLib.ShowHeader();
         
         /* Основная работа */
@@ -121,7 +121,7 @@ public class FriendsCommand : Command<FriendsSettings>
         Guard.Against.Null(_user);
         tsk.Description($"[bold]Пользователь:[/] [underline]{_user.FirstName} {_user.LastName}[/]");
         
-        _friends = _vkServiceLib.FetchFriendsFromUser(userId);
+        _friends = _vkServiceLib.FetchFriendsFromUser(userId).Select(user => user.Id);
 
         tsk.StopTask();
         return Task.CompletedTask;
