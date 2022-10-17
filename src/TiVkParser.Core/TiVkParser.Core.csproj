@@ -12,6 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\TiVkParser.Logging\TiVkParser.Logging.csproj" />
       <ProjectReference Include="..\TiVkParser.Models\TiVkParser.Models.csproj" />
     </ItemGroup>
 

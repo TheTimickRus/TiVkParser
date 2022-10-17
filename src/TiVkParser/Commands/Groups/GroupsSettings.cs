@@ -7,18 +7,13 @@ using Spectre.Console.Cli;
 
 namespace TiVkParser.Commands.Groups;
 
-public class GroupSettings : BaseSettings
+public class GroupsSettings : BaseSettings
 {
-    [Description("Временная граница для получаемых постов. Задается в формате dd:mm:yy (DefaultValue = null)")]
+    [Description("Временная граница для получаемых постов. Задается в формате dd.mm.yyyy (26.10.2022) (DefaultValue = null)")]
     [CommandOption("-d|--date")]
     [DefaultValue(null)]
-    public string? DateFilter { get; init; }
-        
-    [Description("Общий лимит кол-ва получаемых объектов для всех запросов (DefaultValue = 1000)")]
-    [CommandOption("--limit")]
-    [DefaultValue((long)1000)]
-    public long LimitFilter { get; init; }
-        
+    public DateTime? DateFilter { get; init; }
+    
     [Description("Поиск по лайкам (DefaultValue = false)")]
     [CommandOption("--likes")]
     [DefaultValue(false)]

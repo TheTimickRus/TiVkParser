@@ -91,7 +91,7 @@ public class FriendsCommand : Command<FriendsSettings>
             .Start(Work);
         
         /* Сохранение данных */
-        SaveDataService.FriendsToExcel("TiVkParser_Friends.xlsx", _friends);
+        ExportData.ToExcel((null, null, _friends));
         
         /* Завершение работы */
         AnsiConsoleLib.ShowHeader();

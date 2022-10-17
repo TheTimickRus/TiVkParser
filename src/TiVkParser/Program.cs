@@ -19,7 +19,11 @@ app.Configure(conf =>
         .WithAlias("gr")
         .WithDescription("Получение лайков и/или комментариев пользователя в группах")
         .WithExample(new[] { "groups" })
-        .WithExample(new[] { "gr" });
+        .WithExample(new[] { "gr" })
+        .WithExample(new[] { "gr", "-l 10000" })
+        .WithExample(new[] { "gr", "--apiLimit 10000" })
+        .WithExample(new[] { "gr", "--likes" })
+        .WithExample(new[] { "gr", "--date=10.16.2022", "--likes=true", "--comments=false" });
 
     conf.Settings.ApplicationName = $"{Constants.Titles.VeryShortTitle}.exe";
     conf.Settings.ApplicationVersion = Constants.Titles.VersionWithDate;

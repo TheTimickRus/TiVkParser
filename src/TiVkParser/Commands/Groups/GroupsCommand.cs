@@ -10,25 +10,20 @@ using TiVkParser.Core;
 using TiVkParser.Exports;
 using TiVkParser.Helpers;
 using TiVkParser.Logging;
-using TiVkParser.Models.Core.Filters;
 using TiVkParser.Models.Exports;
 using TiVkParser.Models.Main.ConfigurationModels;
 using TiVkParser.Services;
 using Tomlyn;
-using VkNet.Enums;
 
 namespace TiVkParser.Commands.Groups;
 
-public class GroupsCommand : Command<GroupSettings>
+public class GroupsCommand : Command<GroupsSettings>
 {
-    private GroupSettings? _settings;
     private MainConfiguration? _conf;
-    private VkServiceLib? _vkServiceLib;
+
+    private (List<OutLike>, List<OutComment>) _outputData;
     
-    private readonly List<OutLike> _outLikes = new();
-    private readonly List<OutComment> _outComments = new();
-    
-    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] GroupSettings settings)
+    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] GroupsSettings settings)
     {
         try
         {
@@ -54,8 +49,6 @@ public class GroupsCommand : Command<GroupSettings>
                 throw new Exception("Не найден файл конфигурации!");
             
             var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(settings.ConfigFile));
-            if (mainConf.AccessToken is null or "")
-                throw new Exception("Не указан AccessToken!");
             
             _conf = mainConf;
             
@@ -63,22 +56,26 @@ public class GroupsCommand : Command<GroupSettings>
         }
         catch (Exception ex)
         {
+            SerilogLib.Error(ex);
             return ValidationResult.Error(ex.Message);
         }
     }
 
-    public override int Execute([NotNull] CommandContext context, [NotNull] GroupSettings settings)
+    public override int Execute([NotNull] CommandContext context, [NotNull] GroupsSettings settings)
     {
-        _settings = settings;
-        Guard.Against.Null(_conf);
+        Console.Title = Constants.Titles.VeryShortTitle;
+        AnsiConsoleLib.ShowHeader();
         
         SerilogLib.IsLogging = true;
-        Console.Title = Constants.Titles.VeryShortTitle;
+        SerilogLib.FileName = Constants.Titles.LogFileName;
         
-        AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
-        AnsiConsoleLib.ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
+        // Проверки
+        Guard.Against.Null(_conf);
+        Guard.Against.Null(_conf.AccessToken);
+        Guard.Against.Null(_conf.Groups);
+        // Проверки
         
-        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.LimitFilter);
+        var vkLib = new VkServiceLib(_conf.AccessToken, settings.TotalItemsForApi);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
@@ -89,16 +86,12 @@ public class GroupsCommand : Command<GroupSettings>
                     IndeterminateStyle = new Style(foreground: Constants.Colors.MainColor),
                     RemainingStyle = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
-                }, 
+                },
                 new PercentageColumn
                 {
                     Style = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
-                }, 
-                new RemainingTimeColumn
-                {
-                    Style = new Style(Constants.Colors.MainColor)
-                }, 
+                },
                 new SpinnerColumn
                 {
                     Spinner = Spinner.Known.Hamburger, 
@@ -108,242 +101,25 @@ public class GroupsCommand : Command<GroupSettings>
             )
             .Start(ctx =>
             {
-                switch (_conf.Groups?.IsGroupsFromUser)
+                _outputData = _conf.Groups.IsGroupsFromUser switch
                 {
-                    case true:
-                        GroupsFromUser(ctx);
-                        break;
-                    default:
-                        GroupFromConfig(ctx);
-                        break;
-                }
-                
-                return Task.CompletedTask;
+                    true => GroupsFromUser.Execute(ctx, settings, _conf.Groups, vkLib),
+                    _ => GroupsFromConfig.Execute(ctx, settings, _conf.Groups, vkLib)
+                };
             });
         
-        SaveDataService.LikesToExcel("TiVkParser.xlsx", _outLikes);
-        SaveDataService.CommentsToExcel("TiVkParser.xlsx", _outComments);
+        /* Сохранение данных */
+        ExportData.ToExcel((_outputData.Item1, _outputData.Item2, null));
+        
+        /* Завершение работы */
+        AnsiConsoleLib.ShowHeader();
+        AnsiConsoleLib.ShowRule(
+            "Работа программы завершена! Для завершения нажмите любою кнопку", 
+            Justify.Center, 
+            Constants.Colors.SuccessColor
+        );
+        AnsiConsole.Console.Input.ReadKey(true);
         
         return 0;
-    }
-
-    /// <summary>
-    /// Работа с пользователями из файла конфигурации
-    /// </summary>
-    /// <param name="ctx"></param>
-    private void GroupsFromUser(ProgressContext ctx)
-    {
-        Guard.Against.Null(_settings);
-        Guard.Against.Null(_conf);
-        Guard.Against.Null(_conf.Groups);
-        Guard.Against.Null(_vkServiceLib);
-
-        var usersProgressTask = ctx
-            .AddTask("[bold]Получение пользователей[/]")
-            .IsIndeterminate();
-        
-        var users = _vkServiceLib
-            .FetchUsersById(_conf.Groups.UserIds.Select(long.Parse))
-            .ToList();
-
-        usersProgressTask.IsIndeterminate = false;
-        usersProgressTask.MaxValue = users.Count;
-        
-        // Обработка пользователей
-        foreach (var user in users)
-        {
-            usersProgressTask.Description = $"[bold]Пользователь:[/] [underline]{user.FirstName} {user.LastName} ({user.Id})[/]";
-            
-            var groupsProgressTask = ctx
-                .AddTask("[bold]Получение групп пользователя[/]")
-                .IsIndeterminate();
-            
-            var groups = _vkServiceLib
-                .FetchGroupsFromUser(Convert.ToInt64(user.Id))
-                .ToList();
-            
-            groupsProgressTask.IsIndeterminate = false;
-            groupsProgressTask.MaxValue = groups.Count;
-            
-            // Обработка групп пользователя
-            foreach (var group in groups)
-            {
-                groupsProgressTask.Description = $"[bold]Группа:[/] [underline]{group.Name}[/]";
-                
-                var postsProgressTask = ctx
-                    .AddTask("[bold]Получение постов[/]")
-                    .IsIndeterminate();
-
-                var dateParseResult = DateTime.TryParse(_settings.DateFilter, out var dateFilter);
-                var posts = _vkServiceLib
-                    .FetchPostsFromGroup(group.Id, new FetchPostsFilter(10000, dateParseResult ? dateFilter : null))
-                    .Where(post => _settings.IsComments && post.Comments.Count > 0 || _settings.IsLike && post.Likes.Count > 0)
-                    .ToList();
-
-                postsProgressTask.IsIndeterminate = false;
-                postsProgressTask.MaxValue = posts.Count;
-                
-                // Обработка постов из группы
-                foreach (var post in posts)
-                {
-                    postsProgressTask.Description = $"[bold]Пост:[/] [underline]{post.Id}[/]";
-
-                    if (_settings.IsLike)
-                    {
-                        var likes = _vkServiceLib.FetchLikesFromPost(group.Id, post.Id!.Value);
-                        foreach (var unused in likes.Where(like => like.Id == user?.Id))
-                        {
-                            _outLikes.Add(
-                                new OutLike(
-                                    user?.Id.ToString() ?? "-1", 
-                                    group.Id.ToString(), 
-                                    post.Id?.ToString() ?? "-1"
-                                )
-                            );
-                            
-                            SerilogLib.Info($"{user?.Id},{group.Id},{post.Id}");
-                        }
-                        
-                        Thread.Sleep(333);
-                    }
-
-                    if (_settings.IsComments)
-                    {
-                        var comments = _vkServiceLib
-                            .FetchCommentsFromPost(group.Id, post.Id);
-                        foreach (var comment in comments.Where(comment => comment.FromId == user?.Id))
-                        {
-                            _outComments.Add(
-                                new OutComment(
-                                    user?.Id.ToString() ?? "-1",
-                                    group.Id.ToString(), 
-                                    post.Id.ToString() ?? "-1", 
-                                    comment.Id.ToString(), 
-                                    comment.Text
-                                )
-                            );
-                            
-                            SerilogLib.Info($"{user?.Id.ToString() ?? "-1"},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()},{comment.Text}");
-                        }
-                    
-                        Thread.Sleep(333); 
-                    }
-                    
-                    postsProgressTask.Increment(1);
-                }
-                
-                groupsProgressTask.Increment(1);
-            }
-            
-            usersProgressTask.Increment(1);
-        }
-    }
-    
-    /// <summary>
-    /// Работа с группами из файла конфигурации
-    /// </summary>
-    /// <param name="ctx"></param>
-    private void GroupFromConfig(ProgressContext ctx)
-    {
-        Guard.Against.Null(_settings);
-        Guard.Against.Null(_conf);
-        Guard.Against.Null(_conf.Groups);
-        Guard.Against.Zero(_conf.Groups.UserIds.Count);
-        Guard.Against.Zero(_conf.Groups.GroupIds.Count);
-        Guard.Against.Null(_vkServiceLib);
-        
-        var groupsProgressTask = ctx
-            .AddTask($"[bold {Constants.Colors.SecondColor}]Получение групп[/]")
-            .IsIndeterminate();
-        
-        var groups = _vkServiceLib
-            .FetchGroupsInfo(_conf.Groups.GroupIds)
-            .Where(group => group.IsClosed is GroupPublicity.Public)
-            .ToList();
-        
-        groupsProgressTask.IsIndeterminate = false;
-        groupsProgressTask.MaxValue = groups.Count;
-
-        foreach (var group in groups)
-        {
-            groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name} ({group.Id})[/]";
-            
-            var postsProgressTask = ctx
-                .AddTask($"[bold {Constants.Colors.SecondColor}]Получение постов[/]")
-                .IsIndeterminate();
-
-            var filter = new FetchPostsFilter(
-                _settings.LimitFilter,
-                DateTime.TryParse(_settings.DateFilter, out var dateFilter) ? dateFilter : null
-            );
-            var posts = _vkServiceLib
-                .FetchPostsFromGroup(group.Id, filter)
-                .ToList();
-            if (posts.Count is 0)
-                continue;
-            
-            postsProgressTask.IsIndeterminate = false;
-            postsProgressTask.MaxValue = posts.Count;
-            
-            foreach (var post in posts)
-            {
-                postsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}]Пост:[/] [underline]{post.Id}[/]";
-
-                if (_settings.IsLike && post.Likes.Count > 0)
-                {
-                    var likes = _vkServiceLib.FetchLikesFromPost(group.Id, post.Id!.Value);
-                    foreach (var like in likes)
-                    {
-                        foreach (var userId in _conf.Groups.UserIds.Where(userId => like.Id == Convert.ToInt64(userId)))
-                        {
-                            _outLikes.Add(
-                                new OutLike(
-                                    userId, 
-                                    group.Id.ToString(), 
-                                    post.Id?.ToString() ?? "-1"
-                                )
-                            );
-                            
-                            SerilogLib.Info($"Like = ({userId},{group.Id.ToString()},{post.Id.ToString()})");
-                        }
-                    }  
-                    
-                    Thread.Sleep(333);
-                }
-                
-                if (_settings.IsComments && post.Comments.Count > 0)
-                {
-                    var comments = _vkServiceLib.FetchCommentsFromPost(group.Id, post.Id);
-                    foreach (var comment in comments)
-                    {
-                        if (comment.Thread.Count > 0)
-                        {
-                            AnsiConsole.WriteLine("");
-                        }
-                        
-                        foreach (var userId in _conf.Groups.UserIds.Where(userId => comment.FromId == Convert.ToInt64(userId)))
-                        {
-                            _outComments.Add(
-                                new OutComment(
-                                    userId, 
-                                    group.Id.ToString(),
-                                    post.Id.ToString(), 
-                                    comment.Id.ToString(), 
-                                    comment.Text
-                                )
-                            );
-                            
-                            SerilogLib.Info($"Comment = ({userId},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()})");
-                        }
-                    }
-                
-                    Thread.Sleep(333);  
-                }
-                
-                postsProgressTask.Increment(1);
-            }
-            
-            groupsProgressTask.Increment(1);
-        }
     }
 }

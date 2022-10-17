@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using TiVkParser.Core.Helpers;
+using TiVkParser.Logging;
 using TiVkParser.Models.Core.ExecuteModels.FetchPosts;
 using TiVkParser.Models.Core.Filters;
 using VkNet;
@@ -41,43 +42,51 @@ public class VkServiceLib
     /// <returns>Список IDs групп</returns>
     public IEnumerable<long> SearchGroups(string query)
     {
-        var chunk = _api.Groups
-            .Search(
-                new GroupsSearchParams
-                {
-                    Query = query, 
-                    Count = 100, 
-                    Sort = GroupSort.Relation
-                }
-            );
-        
-        var output = new List<Group>(chunk);
-
-        var totalCount = (long)chunk.TotalCount;
-        var limit = _apiLimit < totalCount
-            ? totalCount
-            : _apiLimit;
-        
-        var pagination = new OffsetPagination(limit, 100);
-        while (pagination.IsNotFinal)
+        try
         {
-            chunk = _api.Groups
+            var chunk = _api.Groups
                 .Search(
                     new GroupsSearchParams
                     {
                         Query = query, 
-                        Offset = pagination.CurrentOffset, 
-                        Count = 100,
+                        Count = 100, 
                         Sort = GroupSort.Relation
                     }
                 );
-            
-            output.AddRange(chunk);
-            
-            pagination.Increment();
-        }
         
-        return output.Select(group => group.Id);
+            var output = new List<Group>(chunk);
+
+            var totalCount = (long)chunk.TotalCount;
+            var limit = _apiLimit < totalCount
+                ? totalCount
+                : _apiLimit;
+        
+            var pagination = new OffsetPagination(limit, 100);
+            while (pagination.IsNotFinal)
+            {
+                chunk = _api.Groups
+                    .Search(
+                        new GroupsSearchParams
+                        {
+                            Query = query, 
+                            Offset = pagination.CurrentOffset, 
+                            Count = 100,
+                            Sort = GroupSort.Relation
+                        }
+                    );
+            
+                output.AddRange(chunk);
+            
+                pagination.Increment();
+            }
+        
+            return output.Select(group => group.Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            throw;
+        }
     }
 
     /// <summary>
@@ -87,18 +96,25 @@ public class VkServiceLib
     /// <returns>Список групп</returns>
     public IEnumerable<Group> FetchGroupsInfo(IEnumerable<string> ids)
     {
-        return _api.Groups
-            .GetById(ids, null, GroupsFields.All);
+        try
+        {
+            return _api.Groups.GetById(ids, null, GroupsFields.All);
+        }
+        catch (Exception ex)
+        {
+            SerilogLib.Error(ex);
+            return new List<Group>();
+        }
     }
 
     /// <summary>
     /// Получение постов из группы
     /// </summary>
-    /// <param name="ownerId">ID сообщества</param>
+    /// <param name="groupId">ID сообщества</param>
     /// <param name="filter"></param>
     /// <returns>Посты сообщества</returns>
     [SuppressMessage("Performance", "CA1822:Пометьте члены как статические")]
-    public IEnumerable<Post> FetchPostsFromGroup(long ownerId, FetchPostsFilter filter)
+    public IList<Post> FetchPostsFromGroup(long groupId, FetchPostsFilter filter)
     {
         static PostsExecuteResponse Execute(IVkApiCategories api, long ownerId, long offset)
         {
@@ -132,47 +148,52 @@ public class VkServiceLib
 
             return api.Execute.Execute<PostsExecuteResponse>(executeCode, vkArgs);
         }
-        
-        var data = _api.Wall.Get(
-            new WallGetParams { 
-                OwnerId = ownerId > 0 ? -ownerId : ownerId,
-                Count = 100
-            }
-        );
-        
-        if (data.TotalCount < 100)
-            return data.WallPosts;
-        
-        var allItems = new List<Post>(data.WallPosts);
-        var pagination = new OffsetPagination((long)data.TotalCount, 100);
-        
-        while (pagination.IsNotFinal)
+
+        try
         {
-            var response = Execute(_api, -ownerId, pagination.CurrentOffset);
-            
-            for (var i = 0; i < response.Posts.Ids?.Count; i++)
-            {
-                for (var j = 0; j < response.Posts.Ids?[i].Count; j++)
-                {
-                    var post = new Post
-                    {
-                        Id = response.Posts.Ids[i][j],
-                        Likes = response.Posts.Likes?[i][j],
-                        Comments = response.Posts.Comments?[i][j],
-                        Date = DateTimeOffset.FromUnixTimeSeconds(response.Posts.Dates?[i][j] ?? 0).DateTime
-                    };
-                
-                    allItems.Add(post);
+            var sfGroupId = groupId > 0 ? -groupId : groupId;
+
+            var chunk = _api.Wall.Get(
+                new WallGetParams { 
+                    OwnerId = sfGroupId,
+                    Count = 100
                 }
+            );
+            var output = new List<Post>(chunk.WallPosts);
+            
+            var pagination = new OffsetPagination(GetCurrentLimit(chunk.TotalCount), 100);
+            while (pagination.IsNotFinal)
+            {
+                if (output[^1].Date < filter.DateFilter)
+                    break;
+                
+                var response = Execute(_api, sfGroupId, pagination.CurrentOffset);
+            
+                for (var i = 0; i < response.Posts.Ids?.Count; i++)
+                {
+                    for (var j = 0; j < response.Posts.Ids?[i].Count; j++)
+                    {
+                        var post = new Post
+                        {
+                            Id = response.Posts.Ids[i][j],
+                            Likes = response.Posts.Likes?[i][j],
+                            Comments = response.Posts.Comments?[i][j],
+                            Date = DateTimeOffset.FromUnixTimeSeconds(response.Posts.Dates?[i][j] ?? 0).DateTime
+                        };
+                        output.Add(post);
+                    }
+                }
+                
+                pagination.Increment(2500);
             }
-            
-            pagination.Increment(2500);
-            
-            if (allItems.Count >= filter.TotalLimit)
-                break;
-        }
         
-        return allItems;
+            return output;
+        }
+        catch (Exception ex)
+        {
+            SerilogLib.Error(ex);
+            return new List<Post>();
+        }
     }
 
     /// <summary>
@@ -183,56 +204,61 @@ public class VkServiceLib
     /// <returns>Пользователи</returns>
     public IEnumerable<User> FetchLikesFromPost(long groupId, long postId)
     {
-        var safetyGroupId = groupId < 0 ? -groupId : groupId;
-        
-        var chunk = _api.Likes.GetListEx(new LikesGetListParams { Count = 100, Type = LikeObjectType.Post, ItemId = postId, OwnerId = safetyGroupId });
-        var output = new List<User>(chunk.Users);
-        
-        var pagination = new OffsetPagination(GetCurrentLimit(chunk.TotalCount), 100);
-        while (pagination.IsNotFinal)
+        try
         {
-            output.AddRange(
-                _api.Likes.GetListEx(new LikesGetListParams { Count = 100, Type = LikeObjectType.Post, ItemId = postId, OwnerId = safetyGroupId, Offset = (uint?)pagination.CurrentOffset }).Users
-            );
-            pagination.Increment();
-        }
+            var sfGroupId = groupId > 0 ? -groupId : groupId;
         
-        return output;
+            var chunk = _api.Likes.GetListEx(new LikesGetListParams { Count = 100, Type = LikeObjectType.Post, ItemId = postId, OwnerId = sfGroupId });
+            var output = new List<User>(chunk.Users);
+        
+            var pagination = new OffsetPagination(GetCurrentLimit(chunk.TotalCount), 100);
+            while (pagination.IsNotFinal)
+            {
+                output.AddRange(
+                    _api.Likes.GetListEx(new LikesGetListParams { Count = 100, Type = LikeObjectType.Post, ItemId = postId, OwnerId = sfGroupId, Offset = (uint?)pagination.CurrentOffset }).Users
+                );
+                pagination.Increment();
+            }
+        
+            return output;
+        }
+        catch (Exception ex)
+        {
+            SerilogLib.Error(ex);
+            return new List<User>();
+        }
     }
-    
+
     /// <summary>
     /// Получение комментариев под постом
     /// </summary>
     /// <param name="groupId">ID сообщества</param>
     /// <param name="postId">ID поста</param>
+    /// <param name="commentId"></param>
     /// <returns>Комментарии</returns>
-    public IEnumerable<Comment> FetchCommentsFromPost(long groupId, long? postId)
-    {
-        var safetyGroupId = groupId < 0 ? -groupId : groupId;
-        
-        var chunk = _api.Wall.GetComments(new WallGetCommentsParams { OwnerId = safetyGroupId, PostId = postId ?? 0, Count = 100 });
-        var output = new List<Comment>(chunk.Items);
-        
-        var pagination = new OffsetPagination(GetCurrentLimit(chunk.Count), 100);
-        while (pagination.IsNotFinal)
-        {
-            output.AddRange(
-                _api.Wall.GetComments(new WallGetCommentsParams { OwnerId = safetyGroupId, PostId = postId ?? 0, Count = 100, Offset = pagination.CurrentOffset }).Items
-            );
-            pagination.Increment();
-        }
-        
-        return output;
-    }
-
-    public IEnumerable<Comment> FetchCommentsThread(long groupId, long postId, long commentId)
+    public IEnumerable<Comment> FetchComments(long groupId, long postId, long? commentId  = null)
     {
         try
         {
-            return _api.Wall.GetComments(new WallGetCommentsParams { OwnerId = groupId, Count = 100, PostId = postId, CommentId = commentId }).Items;
+            var sfGroupId = groupId > 0 ? -groupId : groupId;
+        
+            var chunk = _api.Wall.GetComments(new WallGetCommentsParams { OwnerId = sfGroupId, PostId = postId, CommentId = commentId, Count = 100 });
+            var output = new List<Comment>(chunk.Items);
+            
+            var pagination = new OffsetPagination(GetCurrentLimit(chunk.Count), 100);
+            while (pagination.IsNotFinal)
+            {
+                output.AddRange(
+                    _api.Wall.GetComments(new WallGetCommentsParams { OwnerId = sfGroupId, PostId = postId, CommentId = commentId, Count = 100, Offset = pagination.CurrentOffset }).Items
+                );
+                pagination.Increment();
+            }
+        
+            return output;
         }
-        catch
+        catch (Exception ex)
         {
+            SerilogLib.Error(ex.Message);
             return new List<Comment>();
         }
     }
@@ -242,26 +268,27 @@ public class VkServiceLib
     /// </summary>
     /// <param name="userId">ID пользоветеля</param>
     /// <returns>Группы</returns>
-    public IEnumerable<Group> FetchGroupsFromUser(long userId)
+    public IList<Group> FetchGroupsFromUser(long userId)
     {
         try
         {
-            var chunk = _api.Groups.Get(new GroupsGetParams { UserId = userId, Count = 100, Fields = GroupsFields.All });
+            var chunk = _api.Groups.Get(new GroupsGetParams { UserId = userId, Count = 100, Extended = true, Fields = GroupsFields.All });
             var output = new List<Group>(chunk);
             
             var pagination = new OffsetPagination(GetCurrentLimit(chunk.TotalCount), 100);
             while (pagination.IsNotFinal)
             {
                 output.AddRange(
-                    _api.Groups.Get(new GroupsGetParams { UserId = userId, Count = 100, Fields = GroupsFields.All, Offset = pagination.CurrentOffset })
+                    _api.Groups.Get(new GroupsGetParams { UserId = userId, Count = 100, Extended = true,  Fields = GroupsFields.All, Offset = pagination.CurrentOffset })
                 );
                 pagination.Increment();
             }
             
             return output;
         }
-        catch
+        catch (Exception ex)
         {
+            SerilogLib.Error(ex);
             return new List<Group>();
         }
     }
@@ -277,8 +304,9 @@ public class VkServiceLib
         {
             return _api.Users.Get(new List<long> { userId }).FirstOrDefault();
         }
-        catch
+        catch (Exception ex)
         {
+            SerilogLib.Error(ex);
             return null;
         }
     }
@@ -288,14 +316,15 @@ public class VkServiceLib
     /// </summary>
     /// <param name="userIds">ID пользователей</param>
     /// <returns>Пользователи</returns>
-    public IEnumerable<User> FetchUsersById(IEnumerable<long> userIds)
+    public IList<User> FetchUsersById(IEnumerable<long> userIds)
     {
         try
         {
-            return _api.Users.Get(userIds);
+            return _api.Users.Get(userIds, ProfileFields.All);
         }
-        catch
+        catch (Exception ex)
         {
+            SerilogLib.Error(ex);
             return new List<User>();
         }
     }
@@ -323,8 +352,9 @@ public class VkServiceLib
             
             return allFriends;
         }
-        catch
+        catch (Exception ex)
         {
+            SerilogLib.Error(ex);
             return new List<User>();
         }
     }
@@ -332,7 +362,7 @@ public class VkServiceLib
     private long GetCurrentLimit<T>(T totalLimit)
     {
         var tl = Convert.ToInt64(totalLimit);
-        return _apiLimit < tl
+        return _apiLimit > tl
             ? tl
             : _apiLimit;
     }
