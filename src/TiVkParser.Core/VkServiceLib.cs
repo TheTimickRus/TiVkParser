@@ -1,6 +1,6 @@
-﻿using TiVkParser.Helpers;
-using TiVkParser.Models;
-using TiVkParser.Models.ExecuteModels;
+﻿using TiVkParser.Core.Helpers;
+using TiVkParser.Models.ExecuteModels.FetchPosts;
+using TiVkParser.Models.Filters;
 using VkNet;
 using VkNet.Abstractions;
 using VkNet.Enums.Filters;
@@ -10,7 +10,7 @@ using VkNet.Model.Attachments;
 using VkNet.Model.RequestParams;
 using VkNet.Utils;
 
-namespace TiVkParser.Services;
+namespace TiVkParser.Core;
 
 /// <summary>
 /// Надстройка над сервисом VK.NET
@@ -87,9 +87,9 @@ public class VkServiceLib
     /// Получение постов из группы
     /// </summary>
     /// <param name="ownerId">ID сообщества</param>
-    /// <param name="filterParams"></param>
+    /// <param name="filter"></param>
     /// <returns>Посты сообщества</returns>
-    public IEnumerable<Post> FetchPostsFromGroup(long ownerId, FetchPostsFilterParams filterParams)
+    public IEnumerable<Post> FetchPostsFromGroup(long ownerId, FetchPostsFilter filter)
     {
         static PostsExecuteResponse Execute(IVkApiCategories api, long ownerId, ulong offset)
         {
@@ -136,7 +136,6 @@ public class VkServiceLib
         
         var allItems = new List<Post>(data.WallPosts);
         var pagination = new OffsetPagination(data.TotalCount, 100);
-        Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
         
         while (pagination.IsNotFinal)
         {
@@ -160,13 +159,10 @@ public class VkServiceLib
             
             pagination.Increment(2500);
             
-            if (allItems.Count >= filterParams.TotalLimit)
+            if (allItems.Count >= filter.TotalLimit)
                 break;
-            
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
         }
-
-        Console.Title = $"{Constants.Titles.VeryShortTitle}";
+        
         return allItems;
     }
 
@@ -213,7 +209,6 @@ public class VkServiceLib
                 .Users
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | CurrentOffset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты значений
             if (pagination.CurrentOffset > _totalCount)
@@ -222,7 +217,6 @@ public class VkServiceLib
             Thread.Sleep(333);
         }
         
-        Console.Title = Constants.Titles.VeryShortTitle;
         return allItems;
     }
     
@@ -267,7 +261,6 @@ public class VkServiceLib
                 .Items
             );
             pagination.Increment();
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | CurrentOffset = {pagination.CurrentOffset}";
             
             // Временное решение, чтобы не получать миллиарты значений
             if (pagination.CurrentOffset > _totalCount)
@@ -276,10 +269,16 @@ public class VkServiceLib
             Thread.Sleep(333);
         }
         
-        Console.Title = Constants.Titles.VeryShortTitle;
         return allItems;
     }
-    
+
+    public IEnumerable<Comment> FetchCommentsThread(long groupId, long postId, long commentId)
+    {
+        return _api.Wall
+            .GetComments(new WallGetCommentsParams { OwnerId = groupId, Count = 100, PostId = postId, CommentId = commentId })
+            .Items;
+    }
+
     /// <summary>
     /// Получение списка сообществ пользователя
     /// </summary>
@@ -287,49 +286,42 @@ public class VkServiceLib
     /// <returns>Группы</returns>
     public IEnumerable<Group> FetchUserGroups(long userId)
     {
-        var data = _api.Groups.Get(
-            new GroupsGetParams
-            {
-                UserId = userId, 
-                Count = 100,
-                Extended = true
-            }
-        );
-
-        if (data.Count < 100)
-            return data;
-        
-        var allItems = new List<Group>();
-        var pagination = new OffsetPagination((ulong)data.Count);
-        
-        allItems.AddRange(data);
-        pagination.Increment();
-        
-        while (pagination.IsNotFinal)
+        try
         {
-            allItems.AddRange(
-                _api.Groups.Get(
+            var output = new List<Group>();
+
+            var chunk = _api.Groups.Get(
+                new GroupsGetParams { UserId = userId, Count = 100, Fields = GroupsFields.All }
+            );
+            output.AddRange(chunk);
+            
+            var limit = _totalCount < chunk.TotalCount 
+                ? chunk.TotalCount 
+                : _totalCount;
+            
+            var pagination = new OffsetPagination(limit, 100);
+            while (pagination.IsNotFinal)
+            {
+                chunk = _api.Groups.Get(
                     new GroupsGetParams
                     {
                         UserId = userId, 
                         Count = 100, 
-                        Fields = GroupsFields.All,
+                        Fields = GroupsFields.All, 
                         Offset = (long?)pagination.CurrentOffset
                     }
-                )
-            );
-            pagination.Increment();
-            Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
+                );
+                output.AddRange(chunk);
+                
+                pagination.Increment();
+            }
             
-            // Временное решение, чтобы не получать миллиарты значений
-            if (pagination.CurrentOffset > _totalCount)
-                break;
-
-            Thread.Sleep(333);
+            return output;
         }
-        
-        Console.Title = Constants.Titles.VeryShortTitle;
-        return allItems;
+        catch
+        {
+            return new List<Group>();
+        }
     }
 
     /// <summary>

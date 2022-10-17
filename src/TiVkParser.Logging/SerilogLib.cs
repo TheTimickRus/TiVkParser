@@ -5,7 +5,7 @@
 using Serilog;
 using Serilog.Core;
 
-namespace TiVkParser.Services;
+namespace TiVkParser.Logging;
 
 /// <summary>
 /// Обертка для логгера Serilog
@@ -13,6 +13,7 @@ namespace TiVkParser.Services;
 public static class SerilogLib
 {
     public static bool IsLogging { get; set; }
+    public static string FileName { get; set; } = "Log.txt";
     
     private static bool _isConfiguration;
     private static Logger? _logger;
@@ -65,7 +66,7 @@ public static class SerilogLib
             return;
 
         _logger = new LoggerConfiguration()
-            .WriteTo.File($"{Environment.CurrentDirectory}\\{Constants.Titles.LogFileName}")
+            .WriteTo.File(FileName)
             .CreateLogger();
 
         _isConfiguration = true;

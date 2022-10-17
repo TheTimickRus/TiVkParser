@@ -29,4 +29,14 @@
       <EmbeddedResource Include="Assets\TiVkParser.toml" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\TiVkParser.Core\TiVkParser.Core.csproj" />
+      <ProjectReference Include="..\TiVkParser.Exports\TiVkParser.Exports.csproj" />
+      <ProjectReference Include="..\TiVkParser.Logging\TiVkParser.Logging.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Models" />
+    </ItemGroup>
+
 </Project>

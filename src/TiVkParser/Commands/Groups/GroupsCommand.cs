@@ -6,9 +6,12 @@ using System.Diagnostics.CodeAnalysis;
 using Ardalis.GuardClauses;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using TiVkParser.Core;
+using TiVkParser.Exports;
 using TiVkParser.Helpers;
-using TiVkParser.Models;
-using TiVkParser.Models.ConfModels;
+using TiVkParser.Logging;
+using TiVkParser.Models.ConfigurationModels;
+using TiVkParser.Models.Filters;
 using TiVkParser.Models.SaveDataModels;
 using TiVkParser.Services;
 using Tomlyn;
@@ -19,9 +22,7 @@ namespace TiVkParser.Commands.Groups;
 public class GroupsCommand : Command<GroupSettings>
 {
     private GroupSettings? _settings;
-    private GroupsConfiguration? _conf;
-    
-    private string _accessToken = "";
+    private MainConfiguration? _conf;
     
     private readonly List<OutLike> _outLikes = new();
     private readonly List<OutComment> _outComments = new();
@@ -43,7 +44,9 @@ public class GroupsCommand : Command<GroupSettings>
                     Constants.Colors.SuccessColor
                 );
                 AnsiConsole.Console.Input.ReadKey(true);
-                throw new Exception("Пожалуйста, перезапустите программу...");
+                
+                // Завершаем работу программы
+                Environment.Exit(0);
             }
             
             if (settings.ConfigFile is  null || File.Exists(settings.ConfigFile) is false)
@@ -53,8 +56,7 @@ public class GroupsCommand : Command<GroupSettings>
             if (mainConf.AccessToken is null or "")
                 throw new Exception("Не указан AccessToken!");
             
-            _accessToken = mainConf.AccessToken;
-            _conf = mainConf.Groups;
+            _conf = mainConf;
             
             return ValidationResult.Success();
         }
@@ -75,7 +77,7 @@ public class GroupsCommand : Command<GroupSettings>
         AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
         AnsiConsoleLib.ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
         
-        var vkService = new VkServiceLib(_accessToken, (ulong)settings.LimitFilter);
+        var vkService = new VkServiceLib(_conf.AccessToken!, (ulong)settings.LimitFilter);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
@@ -105,10 +107,15 @@ public class GroupsCommand : Command<GroupSettings>
             )
             .Start(ctx =>
             {
-                if (_conf.IsGroupsFromUser)
-                    GroupsFromUser(ctx, vkService);
-                else
-                    GroupFromConfig(ctx, vkService);
+                switch (_conf.Groups?.IsGroupsFromUser)
+                {
+                    case true:
+                        GroupsFromUser(ctx, vkService);
+                        break;
+                    default:
+                        GroupFromConfig(ctx, vkService);
+                        break;
+                }
                 
                 return Task.CompletedTask;
             });
@@ -128,13 +135,14 @@ public class GroupsCommand : Command<GroupSettings>
     {
         Guard.Against.Null(_settings);
         Guard.Against.Null(_conf);
+        Guard.Against.Null(_conf.Groups);
 
         var usersProgressTask = ctx
-            .AddTask("[bold]Получение пользователей[/][/]")
+            .AddTask("[bold]Получение пользователей[/]")
             .IsIndeterminate();
         
         var users = vkService
-            .FetchUsersById(_conf.UserIds.Select(long.Parse))
+            .FetchUsersById(_conf.Groups.UserIds.Select(long.Parse))
             .ToList();
 
         usersProgressTask.IsIndeterminate = false;
@@ -167,7 +175,7 @@ public class GroupsCommand : Command<GroupSettings>
 
                 var dateParseResult = DateTime.TryParse(_settings.DateFilter, out var dateFilter);
                 var posts = vkService
-                    .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(10000, dateParseResult ? dateFilter : null))
+                    .FetchPostsFromGroup(group.Id, new FetchPostsFilter(10000, dateParseResult ? dateFilter : null))
                     .Where(post => _settings.IsComments && post.Comments.Count > 0 || _settings.IsLike && post.Likes.Count > 0)
                     .ToList();
 
@@ -240,32 +248,37 @@ public class GroupsCommand : Command<GroupSettings>
     {
         Guard.Against.Null(_settings);
         Guard.Against.Null(_conf);
-        Guard.Against.Zero(_conf.UserIds.Count);
-        Guard.Against.Zero(_conf.GroupIds.Count);
+        Guard.Against.Null(_conf.Groups);
+        Guard.Against.Zero(_conf.Groups.UserIds.Count);
+        Guard.Against.Zero(_conf.Groups.GroupIds.Count);
         
         var groupsProgressTask = ctx
             .AddTask($"[bold {Constants.Colors.SecondColor}]Получение групп[/]")
             .IsIndeterminate();
         
-        var groups = vkService.FetchGroupsInfo(_conf.GroupIds)
+        var groups = vkService
+            .FetchGroupsInfo(_conf.Groups.GroupIds)
             .Where(group => group.IsClosed is GroupPublicity.Public)
             .ToList();
         
         groupsProgressTask.IsIndeterminate = false;
         groupsProgressTask.MaxValue = groups.Count;
-        
+
         foreach (var group in groups)
         {
-            groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name}[/]";
+            groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name} ({group.Id})[/]";
             
             var postsProgressTask = ctx
                 .AddTask($"[bold {Constants.Colors.SecondColor}]Получение постов[/]")
                 .IsIndeterminate();
-            
-            var dateParseResult = DateTime.TryParse(_settings.DateFilter, out var dateFilter);
-            var posts = VkServiceLib.FetchPostsFromGroup(group.Id, new FetchPostsFilterParams((long)_settings.LimitFilter, dateParseResult ? dateFilter : null))
+
+            var filter = new FetchPostsFilter(
+                _settings.LimitFilter,
+                DateTime.TryParse(_settings.DateFilter, out var dateFilter) ? dateFilter : null
+            );
+            var posts = vkService
+                .FetchPostsFromGroup(group.Id, filter)
                 .ToList();
-            
             if (posts.Count is 0)
                 continue;
             
@@ -281,7 +294,7 @@ public class GroupsCommand : Command<GroupSettings>
                     var likes = vkService.FetchLikesFromPost(group.Id, post.Id);
                     foreach (var like in likes)
                     {
-                        foreach (var userId in _conf.UserIds.Where(userId => like.Id == Convert.ToInt64(userId)))
+                        foreach (var userId in _conf.Groups.UserIds.Where(userId => like.Id == Convert.ToInt64(userId)))
                         {
                             _outLikes.Add(
                                 new OutLike(
@@ -295,15 +308,20 @@ public class GroupsCommand : Command<GroupSettings>
                         }
                     }  
                     
-                    //Thread.Sleep(333);
+                    Thread.Sleep(333);
                 }
-
+                
                 if (_settings.IsComments && post.Comments.Count > 0)
                 {
                     var comments = vkService.FetchCommentsFromPost(group.Id, post.Id);
                     foreach (var comment in comments)
                     {
-                        foreach (var userId in _conf.UserIds.Where(userId => comment.FromId == Convert.ToInt64(userId)))
+                        if (comment.Thread.Count > 0)
+                        {
+                            AnsiConsole.WriteLine("");
+                        }
+                        
+                        foreach (var userId in _conf.Groups.UserIds.Where(userId => comment.FromId == Convert.ToInt64(userId)))
                         {
                             _outComments.Add(
                                 new OutComment(
@@ -317,6 +335,8 @@ public class GroupsCommand : Command<GroupSettings>
                             
                             SerilogLib.Info($"Comment = ({userId},{group.Id.ToString()},{post.Id.ToString()},{comment.Id.ToString()})");
                         }
+                        
+                        
                     }
                 
                     Thread.Sleep(333);  

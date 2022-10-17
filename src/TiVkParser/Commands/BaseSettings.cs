@@ -1,3 +1,5 @@
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+
 using System.ComponentModel;
 using Spectre.Console.Cli;
 

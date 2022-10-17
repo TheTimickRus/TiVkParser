@@ -1,7 +1,7 @@
 using OfficeOpenXml;
 using TiVkParser.Models.SaveDataModels;
 
-namespace TiVkParser.Services;
+namespace TiVkParser.Exports;
 
 public static class SaveDataService
 {

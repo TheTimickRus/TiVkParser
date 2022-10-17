@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 using TiVkParser;
 using TiVkParser.Commands.Friends;
 using TiVkParser.Commands.Groups;
+using TiVkParser.Logging;
 using TiVkParser.Services;
 
 var app = new CommandApp();

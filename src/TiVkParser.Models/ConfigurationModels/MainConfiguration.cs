@@ -1,7 +1,7 @@
 // ReSharper disable CollectionNeverUpdated.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace TiVkParser.Models.ConfModels;
+namespace TiVkParser.Models.ConfigurationModels;
 
 public record MainConfiguration
 {

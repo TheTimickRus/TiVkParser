@@ -1,6 +1,6 @@
 // ReSharper disable MemberCanBePrivate.Global
 
-namespace TiVkParser.Helpers;
+namespace TiVkParser.Core.Helpers;
 
 /// <summary>
 /// Класс - Helper для работы с VK пагинацией
