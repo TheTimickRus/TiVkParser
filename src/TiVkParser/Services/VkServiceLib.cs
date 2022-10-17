@@ -18,14 +18,14 @@ namespace TiVkParser.Services;
 public class VkServiceLib
 {
     private readonly IVkApi _api = new VkApi();
-    private readonly long _totalCount;
+    private readonly ulong _totalCount;
 
     /// <summary>
     /// Конструктор с параметрами
     /// </summary>
     /// <param name="accessToken">Токен доступа</param>
     /// <param name="totalCount">Максимальное кол-во элементов, получаемых в методах</param>
-    public VkServiceLib(string accessToken, long totalCount)
+    public VkServiceLib(string accessToken, ulong totalCount)
     {
         _api.Authorize(new ApiAuthParams { AccessToken = accessToken });
         _api.Account.GetProfileInfo();
@@ -37,12 +37,39 @@ public class VkServiceLib
     /// Поиск групп по запросу
     /// </summary>
     /// <param name="query">Запрос</param>
+    /// <param name="limitForCurrentMethod">Лимит для текущего метода. Если он не указан будет использоваться общий лимит</param>
     /// <returns>Список IDs групп</returns>
-    public IEnumerable<string> SearchGroups(string query)
+    public IEnumerable<long> SearchGroups(string query, ulong? limitForCurrentMethod = null)
     {
-        return _api.Groups
-            .Search(new GroupsSearchParams { Query = query, Count = 100, Sort = GroupSort.Relation })
-            .Select(group => group.Id.ToString());
+        var data = _api.Groups
+            .Search(new GroupsSearchParams { Query = query, Count = 100, Sort = GroupSort.Relation });
+
+        if (data.Count <= 100)
+            return data.Select(group => group.Id);
+
+        var allGroups = new List<Group>();
+        allGroups.AddRange(data);
+
+        var limit = limitForCurrentMethod ?? _totalCount;
+        var pagination = new OffsetPagination(limit < data.TotalCount ? data.TotalCount : limit, 100);
+        
+        while (pagination.IsNotFinal)
+        {
+            data = _api.Groups
+                .Search(new GroupsSearchParams
+                {
+                    Query = query, 
+                    Offset = (long?)pagination.CurrentOffset, 
+                    Count = 100,
+                    Sort = GroupSort.Relation
+                }); 
+            
+            allGroups.AddRange(data);
+            
+            pagination.Increment();
+        }
+        
+        return allGroups.Select(group => group.Id);
     }
 
     /// <summary>
@@ -64,7 +91,7 @@ public class VkServiceLib
     /// <returns>Посты сообщества</returns>
     public IEnumerable<Post> FetchPostsFromGroup(long ownerId, FetchPostsFilterParams filterParams)
     {
-        static PostsExecuteResponse Execute(IVkApiCategories api, long ownerId, long offset)
+        static PostsExecuteResponse Execute(IVkApiCategories api, long ownerId, ulong offset)
         {
             const string executeCode = 
                 $$"""
@@ -108,8 +135,7 @@ public class VkServiceLib
             return data.WallPosts;
         
         var allItems = new List<Post>(data.WallPosts);
-        var pagination = new OffsetPagination((long)data.TotalCount);
-        pagination.Increment(100);
+        var pagination = new OffsetPagination(data.TotalCount, 100);
         Console.Title = $"{Constants.Titles.VeryShortTitle} | Offset = {pagination.CurrentOffset}";
         
         while (pagination.IsNotFinal)
@@ -166,7 +192,7 @@ public class VkServiceLib
             return data.Users;
         
         var allItems = new List<User>();
-        var pagination = new OffsetPagination((long)data.TotalCount);
+        var pagination = new OffsetPagination(data.TotalCount);
         
         allItems.AddRange(data.Users);
         pagination.Increment();
@@ -221,7 +247,7 @@ public class VkServiceLib
             return data.Items;
         
         var allItems = new List<Comment>();
-        var pagination = new OffsetPagination(data.Count);
+        var pagination = new OffsetPagination((ulong)data.Count);
         
         allItems.AddRange(data.Items);
         pagination.Increment();
@@ -235,7 +261,7 @@ public class VkServiceLib
                         OwnerId = groupId > 0 ? -groupId : groupId, 
                         PostId = postId ?? 0, 
                         Count = 100,
-                        Offset = pagination.CurrentOffset
+                        Offset = (long?)pagination.CurrentOffset
                     }
                 )
                 .Items
@@ -274,7 +300,7 @@ public class VkServiceLib
             return data;
         
         var allItems = new List<Group>();
-        var pagination = new OffsetPagination(data.Count);
+        var pagination = new OffsetPagination((ulong)data.Count);
         
         allItems.AddRange(data);
         pagination.Increment();
@@ -288,7 +314,7 @@ public class VkServiceLib
                         UserId = userId, 
                         Count = 100, 
                         Fields = GroupsFields.All,
-                        Offset = pagination.CurrentOffset
+                        Offset = (long?)pagination.CurrentOffset
                     }
                 )
             );
@@ -349,23 +375,25 @@ public class VkServiceLib
     {
         try
         {
-            var allFriends = new List<long>();
+            var allFriends = new List<User>();
             
-            var chunkFriends = _api.Friends.Get(new FriendsGetParams { UserId = userId, Count = 100 });
-            allFriends.AddRange(chunkFriends.Select(user => user.Id));
+            var chunk = _api.Friends.Get(new FriendsGetParams { UserId = userId, Count = 100 });
+            allFriends.AddRange(chunk);
             
-            var pagination = new OffsetPagination((long) chunkFriends.TotalCount);
-            pagination.Increment(100);
+            var limit = _totalCount < chunk.TotalCount 
+                ? chunk.TotalCount 
+                : _totalCount;
             
+            var pagination = new OffsetPagination(limit, 100);
             while (pagination.IsNotFinal)
             {
-                chunkFriends = _api.Friends.Get(new FriendsGetParams { UserId = userId, Count = 100, Offset = pagination.CurrentOffset });
-                allFriends.AddRange(chunkFriends.Select(user => user.Id));
+                chunk = _api.Friends.Get(new FriendsGetParams { UserId = userId, Count = 100, Offset = (long)pagination.CurrentOffset });
+                allFriends.AddRange(chunk);
                 
-                pagination.Increment(100);
+                pagination.Increment();
             }
-
-            return allFriends;
+            
+            return allFriends.Select(user => user.Id);
         }
         catch
         {

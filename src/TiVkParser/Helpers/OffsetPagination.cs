@@ -1,3 +1,5 @@
+// ReSharper disable MemberCanBePrivate.Global
+
 namespace TiVkParser.Helpers;
 
 /// <summary>
@@ -8,43 +10,47 @@ public class OffsetPagination
     /// <summary>
     /// Общее количество элементов
     /// </summary>
-    public long TotalCount { get; set; } = 1;
+    public ulong TotalCount { get; set; }
+    
     /// <summary>
     /// Текущий Offset. Передавать в API запрос
     /// </summary>
-    public long CurrentOffset { get; private set; }
+    public ulong CurrentOffset { get; private set; }
+    
+    /// <summary>
+    /// Величина, на которую необходимо смещать значение пагинации
+    /// </summary>
+    public ulong OffsetLenght { get; set; }
+    
     /// <summary>
     /// Признак окончания работы пагинации. Передавать в условие цикла
     /// </summary>
     public bool IsNotFinal => TotalCount > CurrentOffset;
     
     /// <summary>
-    /// Величина смещения
-    /// </summary>
-    private readonly long _offsetLenght;
-    
-    /// <summary>
-    /// Конструктор с параметрами #2
+    /// Конструктор
     /// </summary>
     /// <param name="totalCount">Всего объектов</param>
+    /// <param name="offsetStart">С какого значения начинать пагинацию. По умолчанию - 0</param>
     /// <param name="offsetLenght">Величина смещения. По умолчанию - 100</param>
-    public OffsetPagination(long totalCount, long offsetLenght = 100)
+    public OffsetPagination(ulong totalCount, ulong offsetStart = 0, ulong offsetLenght = 100)
     {
         TotalCount = totalCount;
-        _offsetLenght = offsetLenght;
+        CurrentOffset = offsetStart;
+        OffsetLenght = offsetLenght;
     }
     
     /// <summary>
     /// Метод для увеличения Offset. Вызывать в теле цикла, после выполнения API запроса
     /// </summary>
-    public void Increment(long? offset = null)
+    public void Increment(ulong? manualOffsetForCurrentIteration = null)
     {
-        if (offset is null)
+        if (manualOffsetForCurrentIteration is null)
         {
-            CurrentOffset += _offsetLenght;
+            CurrentOffset += OffsetLenght;
             return;
         }
         
-        CurrentOffset += offset.Value;
+        CurrentOffset += manualOffsetForCurrentIteration.Value;
     }
 }

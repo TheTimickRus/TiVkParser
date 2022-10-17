@@ -25,7 +25,7 @@ public static class SaveDataService
         package.Save();
     }
     
-    public static void FriendsToExcel(string fileName, List<long> data)
+    public static void FriendsToExcel(string fileName, IEnumerable<long> data)
     {
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         var package = new ExcelPackage(new FileInfo(fileName));

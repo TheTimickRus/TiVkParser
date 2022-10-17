@@ -2,7 +2,6 @@
 // ReSharper disable RedundantNullableFlowAttribute
 // ReSharper disable ClassNeverInstantiated.Global
 
-using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using Ardalis.GuardClauses;
 using Spectre.Console;
@@ -15,70 +14,57 @@ using TiVkParser.Services;
 using Tomlyn;
 using VkNet.Enums;
 
-namespace TiVkParser.Commands;
+namespace TiVkParser.Commands.Groups;
 
-public class GroupsCommand : Command<GroupsCommand.Settings>
+public class GroupsCommand : Command<GroupSettings>
 {
-    public class Settings : CommandSettings
-    {
-        [Description("Путь до файла конфигурации (Default = TiVkParser.toml)")]
-        [CommandOption("-c|--cfg")]
-        [DefaultValue("TiVkParser.toml")]
-        public string? ConfigFile { get; init; }
-
-        [Description("Временная граница для получаемых постов. Задается в формате dd:mm:yy (Default = null)")]
-        [CommandOption("-d|--date")]
-        [DefaultValue(null)]
-        public string? DateFilter { get; init; }
-        
-        [Description("Общий лимит кол-ва получаемых объектов для всех запросов (Default = 1000)")]
-        [CommandOption("-l|--limit")]
-        [DefaultValue((long)1000)]
-        public long LimitFilter { get; init; }
-        
-        [Description("Поиск по лайкам")]
-        [CommandOption("--likes")]
-        [DefaultValue(false)]
-        public bool IsLike { get; init; }
-        
-        [Description("Поиск по комментариям")]
-        [CommandOption("--comments")]
-        [DefaultValue(false)]
-        public bool IsComments { get; init; }
-    }
-    
-    private Settings? _settings;
+    private GroupSettings? _settings;
     private GroupsConfiguration? _conf;
+    
     private string _accessToken = "";
+    
     private readonly List<OutLike> _outLikes = new();
     private readonly List<OutComment> _outComments = new();
-
-    public GroupsCommand()
+    
+    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] GroupSettings settings)
     {
-        Console.Title = Constants.Titles.FullTitle;
-    }
-
-    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] Settings settings)
-    {
-        Guard.Against.Null(settings.ConfigFile);
-        
-        if (!File.Exists(settings.ConfigFile))
+        try
         {
-            AnyHelpers.ExtractResourceToFile("TiVkParser", "Assets", "TiVkParser.toml", Environment.CurrentDirectory);
-            throw new Exception("Не найден файл конфигурации! Стандартный файл конфигурации создан - TiVkParser.toml. Заполните его и перезапустите программу...");
+            Console.Title = Constants.Titles.VeryShortTitle;
+            
+            if (settings.IsExtractConfigFile)
+            {
+                AnyHelpers.ExtractResourceToFile("TiVkParser", "Assets", "TiVkParser.toml", Environment.CurrentDirectory);
+            
+                AnsiConsoleLib.ShowHeader();
+                AnsiConsoleLib.ShowRule(
+                    "Конфигурационный файл сохранен! Пожалуйста, заполните его и запустите программу заного", 
+                    Justify.Center, 
+                    Constants.Colors.SuccessColor
+                );
+                AnsiConsole.Console.Input.ReadKey(true);
+                throw new Exception("Пожалуйста, перезапустите программу...");
+            }
+            
+            if (settings.ConfigFile is  null || File.Exists(settings.ConfigFile) is false)
+                throw new Exception("Не найден файл конфигурации!");
+            
+            var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(settings.ConfigFile));
+            if (mainConf.AccessToken is null or "")
+                throw new Exception("Не указан AccessToken!");
+            
+            _accessToken = mainConf.AccessToken;
+            _conf = mainConf.Groups;
+            
+            return ValidationResult.Success();
         }
-        
-        if (!settings.IsLike && !settings.IsComments)
-            throw new Exception("Вы не выбрали что искать. Установить соответствующие параметры для поиска лайков или комментариев");
-        
-        var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(settings.ConfigFile));
-        _accessToken = mainConf.AccessToken ?? "";
-        _conf = mainConf.Groups;
-        
-        return ValidationResult.Success();
+        catch (Exception ex)
+        {
+            return ValidationResult.Error(ex.Message);
+        }
     }
 
-    public override int Execute([NotNull] CommandContext context, [NotNull] Settings settings)
+    public override int Execute([NotNull] CommandContext context, [NotNull] GroupSettings settings)
     {
         _settings = settings;
         Guard.Against.Null(_conf);
@@ -89,7 +75,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
         AnsiConsoleLib.ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
         AnsiConsoleLib.ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
         
-        var vkService = new VkServiceLib(_accessToken, settings.LimitFilter);
+        var vkService = new VkServiceLib(_accessToken, (ulong)settings.LimitFilter);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
@@ -277,8 +263,7 @@ public class GroupsCommand : Command<GroupsCommand.Settings>
                 .IsIndeterminate();
             
             var dateParseResult = DateTime.TryParse(_settings.DateFilter, out var dateFilter);
-            var posts = vkService
-                .FetchPostsFromGroup(group.Id, new FetchPostsFilterParams(_settings.LimitFilter, dateParseResult ? dateFilter : null))
+            var posts = VkServiceLib.FetchPostsFromGroup(group.Id, new FetchPostsFilterParams((long)_settings.LimitFilter, dateParseResult ? dateFilter : null))
                 .ToList();
             
             if (posts.Count is 0)

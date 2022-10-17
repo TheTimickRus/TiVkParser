@@ -6,8 +6,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <Company>Timick</Company>
-        <AssemblyVersion>1.1</AssemblyVersion>
-        <FileVersion>1.1</FileVersion>
+        <AssemblyVersion>2.0</AssemblyVersion>
+        <FileVersion>2.0</FileVersion>
         <NeutralLanguage>ru</NeutralLanguage>
         <Product>TiVkParser by Timick</Product>
         <LangVersion>preview</LangVersion>
@@ -16,11 +16,11 @@
 
     <ItemGroup>
       <PackageReference Include="Ardalis.GuardClauses" Version="4.0.1" />
-      <PackageReference Include="EPPlus" Version="6.0.7" />
+      <PackageReference Include="EPPlus" Version="6.0.8" />
       <PackageReference Include="Serilog.Sinks.File" Version="5.0.1-dev-00947" />
-      <PackageReference Include="Spectre.Console" Version="0.45.1-preview.0.4" />
-      <PackageReference Include="Spectre.Console.Cli" Version="0.45.1-preview.0.4" />
-      <PackageReference Include="Tomlyn" Version="0.15.0" />
+      <PackageReference Include="Spectre.Console" Version="0.45.1-preview.0.27" />
+      <PackageReference Include="Spectre.Console.Cli" Version="0.45.1-preview.0.27" />
+      <PackageReference Include="Tomlyn" Version="0.15.1" />
       <PackageReference Include="VkNet" Version="1.71.0" />
     </ItemGroup>
 
