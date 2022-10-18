@@ -4,6 +4,8 @@
 
 using System.Diagnostics.CodeAnalysis;
 using Ardalis.GuardClauses;
+using MoreLinq;
+using MoreLinq.Experimental;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using TiVkParser.Core;
@@ -159,12 +161,7 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
 
             foreach (var post in posts)
             {
-                postsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}]Пост:[/] [underline]{post.Id} ({post.Date})[/]";
                 
-                if (_settings.IsComments)
-                {
-                    
-                }
             }
         }
     }

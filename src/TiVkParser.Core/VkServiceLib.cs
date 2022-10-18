@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using MoreLinq;
 using TiVkParser.Core.Helpers;
 using TiVkParser.Logging;
 using TiVkParser.Models.Core.ExecuteModels.FetchPosts;
@@ -168,7 +169,6 @@ public class VkServiceLib
                     break;
                 
                 var response = Execute(_api, sfGroupId, pagination.CurrentOffset);
-            
                 for (var i = 0; i < response.Posts.Ids?.Count; i++)
                 {
                     for (var j = 0; j < response.Posts.Ids?[i].Count; j++)

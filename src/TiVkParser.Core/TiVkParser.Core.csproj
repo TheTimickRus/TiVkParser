@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="morelinq" Version="3.3.2" />
       <PackageReference Include="VkNet" Version="1.71.0" />
     </ItemGroup>
 
