@@ -4,24 +4,37 @@ namespace TiVkParser.Helpers;
 
 public static class AnyHelpers
 {
+    /// <summary>
+    /// Метод, для извлечения вшитых ресурсов
+    /// </summary>
+    /// <param name="nameSpace">Пространство имен</param>
+    /// <param name="resPath">Путь до ресурса (Разделитель - .)</param>
+    /// <param name="resName">Название ресурса (с расширением)</param>
+    /// <param name="outDirectory">Папка, в которую необходимо извдечь ресурсы (Без \ в конце)</param>
+    /// <example>
+    /// AnyHelpers.ExtractResourceToFile("TiVkParser", "Assets", "TiVkParser.toml", Environment.CurrentDirectory);
+    /// </example>
     public static void ExtractResourceToFile(
         string nameSpace, 
-        string internalFilePath, 
-        string resourceName,
+        string resPath, 
+        string resName,
         string outDirectory 
     )
     {
-        if (!Directory.Exists(outDirectory))
+        // Если нет папки, в которую необходимо извлекать ресурсы - создаем
+        if (Directory.Exists(outDirectory) is false)
             Directory.CreateDirectory(outDirectory);
         
-        var assembly = Assembly.GetCallingAssembly();
-        using var s = assembly.GetManifestResourceStream(nameSpace + "." + (internalFilePath == "" ? "" : internalFilePath + ".") + resourceName);
-        if (s == null) 
-            return;
+        using var stream = Assembly
+            .GetCallingAssembly()
+            .GetManifestResourceStream(nameSpace + "." + (resPath is "" ? "" : resPath + ".") + resName);
         
-        using var r = new BinaryReader(s);
-        using var fs = new FileStream(outDirectory + "\\" + resourceName, FileMode.OpenOrCreate);
-        using var w = new BinaryWriter(fs);
-        w.Write(r.ReadBytes((int)s.Length));
+        if (stream is null)
+            throw new Exception("Ресурс не найден!");
+        
+        using var binaryReader = new BinaryReader(stream);
+        using var fileStream = new FileStream(outDirectory + "\\" + resName, FileMode.OpenOrCreate);
+        using var binaryWriter = new BinaryWriter(fileStream);
+        binaryWriter.Write(binaryReader.ReadBytes((int)stream.Length));
     }
 }

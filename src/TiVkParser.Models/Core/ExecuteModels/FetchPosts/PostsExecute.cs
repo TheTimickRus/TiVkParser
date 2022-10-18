@@ -1,16 +1,8 @@
 using System.Collections.ObjectModel;
 using Newtonsoft.Json;
 using VkNet.Model;
-using VkNet.Utils;
 
-namespace TiVkParser.Models.ExecuteModels;
-
-[Serializable]
-public class PostsExecuteResponse
-{
-    [JsonProperty("posts")] public PostsExecute Posts { get; set; } = new();
-    [JsonProperty("offset")] public long CurrentOffset { get; set; }
-}
+namespace TiVkParser.Models.Core.ExecuteModels.FetchPosts;
 
 [Serializable]
 public class PostsExecute

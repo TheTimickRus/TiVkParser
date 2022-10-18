@@ -1,15 +1,30 @@
 ﻿using Spectre.Console;
 using Spectre.Console.Cli;
 using TiVkParser;
-using TiVkParser.Commands;
+using TiVkParser.Commands.Friends;
+using TiVkParser.Commands.Groups;
+using TiVkParser.Logging;
 using TiVkParser.Services;
 
 var app = new CommandApp();
 app.Configure(conf =>
 {
-    conf.AddCommand<GroupsCommand>("groups");
-    conf.AddCommand<FriendsCommand>("friends");
-    
+    conf.AddCommand<FriendsCommand>("friends")
+        .WithAlias("fr")
+        .WithDescription("Получение друзей пользователя используя UserID")
+        .WithExample(new[] { "friends" })
+        .WithExample(new[] { "fr" });
+
+    conf.AddCommand<GroupsCommand>("groups")
+        .WithAlias("gr")
+        .WithDescription("Получение лайков и/или комментариев пользователя в группах")
+        .WithExample(new[] { "groups" })
+        .WithExample(new[] { "gr" })
+        .WithExample(new[] { "gr", "-l 10000" })
+        .WithExample(new[] { "gr", "--apiLimit 10000" })
+        .WithExample(new[] { "gr", "--likes" })
+        .WithExample(new[] { "gr", "--date=10.16.2022", "--likes=true", "--comments=false" });
+
     conf.Settings.ApplicationName = $"{Constants.Titles.VeryShortTitle}.exe";
     conf.Settings.ApplicationVersion = Constants.Titles.VersionWithDate;
     conf.Settings.ExceptionHandler += ex => 
@@ -26,4 +41,5 @@ app.Configure(conf =>
         return -1;
     };
 });
+
 await app.RunAsync(args);

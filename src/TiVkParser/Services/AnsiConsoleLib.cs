@@ -6,7 +6,6 @@ public static class AnsiConsoleLib
 {
     public static void ShowFiglet(string text, Justify? alignment, Color? color)
     {
-        AnsiConsole.Clear();
         AnsiConsole.Write(new FigletText(text) { Alignment = alignment, Color = color });
         AnsiConsole.WriteLine();
     }
@@ -20,5 +19,14 @@ public static class AnsiConsoleLib
                 Style = new Style(color)
             });
         AnsiConsole.WriteLine();
+    }
+
+    public static void ShowHeader(bool clearConsole = true)
+    {
+        if (clearConsole)
+            AnsiConsole.Console.Clear();
+        
+        ShowFiglet(Constants.Titles.VeryShortTitle, Justify.Center, Constants.Colors.MainColor);
+        ShowRule(Constants.Titles.FullTitle, Justify.Right, Constants.Colors.MainColor);
     }
 }
