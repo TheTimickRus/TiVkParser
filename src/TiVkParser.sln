@@ -2,6 +2,14 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TiVkParser", "TiVkParser\TiVkParser.csproj", "{4C55C66E-D717-47EC-A46A-869590986883}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TiVkParser.Core", "TiVkParser.Core\TiVkParser.Core.csproj", "{316CA11E-3673-4F86-957E-84DE160FBBC5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TiVkParser.Logging", "TiVkParser.Logging\TiVkParser.Logging.csproj", "{E2BD6716-CFD1-4F40-8D6A-1CD5D61A44AA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TiVkParser.Exports", "TiVkParser.Exports\TiVkParser.Exports.csproj", "{72EE3450-C740-4AA7-B045-81D7973A0662}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TiVkParser.Models", "TiVkParser.Models\TiVkParser.Models.csproj", "{EADE9066-00D7-4120-A640-0AAC41B80998}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +20,21 @@ Global
 		{4C55C66E-D717-47EC-A46A-869590986883}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C55C66E-D717-47EC-A46A-869590986883}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C55C66E-D717-47EC-A46A-869590986883}.Release|Any CPU.Build.0 = Release|Any CPU
+		{316CA11E-3673-4F86-957E-84DE160FBBC5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{316CA11E-3673-4F86-957E-84DE160FBBC5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{316CA11E-3673-4F86-957E-84DE160FBBC5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{316CA11E-3673-4F86-957E-84DE160FBBC5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2BD6716-CFD1-4F40-8D6A-1CD5D61A44AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2BD6716-CFD1-4F40-8D6A-1CD5D61A44AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2BD6716-CFD1-4F40-8D6A-1CD5D61A44AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2BD6716-CFD1-4F40-8D6A-1CD5D61A44AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{72EE3450-C740-4AA7-B045-81D7973A0662}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72EE3450-C740-4AA7-B045-81D7973A0662}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72EE3450-C740-4AA7-B045-81D7973A0662}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72EE3450-C740-4AA7-B045-81D7973A0662}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EADE9066-00D7-4120-A640-0AAC41B80998}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EADE9066-00D7-4120-A640-0AAC41B80998}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EADE9066-00D7-4120-A640-0AAC41B80998}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EADE9066-00D7-4120-A640-0AAC41B80998}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
