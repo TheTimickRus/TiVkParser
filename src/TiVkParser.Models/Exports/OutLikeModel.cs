@@ -2,7 +2,7 @@
 
 namespace TiVkParser.Models.Exports;
 
-public record OutLike(
+public record OutLikeModel(
     string? UserId, 
     string? GroupId, 
     string? PostId,

@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 using TiVkParser;
 using TiVkParser.Commands.Friends;
 using TiVkParser.Commands.Groups;
+using TiVkParser.Commands.SearchByKeywords;
 using TiVkParser.Logging;
 using TiVkParser.Services;
 
@@ -25,6 +26,12 @@ app.Configure(conf =>
         .WithExample(new[] { "gr", "--likes" })
         .WithExample(new[] { "gr", "--date=10.16.2022", "--likes=true", "--comments=false" });
 
+    conf.AddCommand<SearchByKeywordsCommand>("keywords")
+        .WithAlias("kw")
+        .WithDescription("Получение постов и/или комментариев по ключевым словам")
+        .WithExample(new[] { "keyword" })
+        .WithExample(new[] { "kw" });
+
     conf.Settings.ApplicationName = $"{Constants.Titles.VeryShortTitle}.exe";
     conf.Settings.ApplicationVersion = Constants.Titles.VersionWithDate;
     conf.Settings.ExceptionHandler += ex => 
@@ -41,5 +48,7 @@ app.Configure(conf =>
         return -1;
     };
 });
+
+SerilogLib.FileName = Constants.Titles.LogFileName;
 
 await app.RunAsync(args);

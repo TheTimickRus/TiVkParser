@@ -10,23 +10,23 @@ using TiVkParser.Core;
 using TiVkParser.Exports;
 using TiVkParser.Helpers;
 using TiVkParser.Logging;
+using TiVkParser.Models.Core.Filters;
 using TiVkParser.Models.Exports;
 using TiVkParser.Models.Main.ConfigurationModels;
 using TiVkParser.Services;
 using Tomlyn;
-using VkNet.Model;
+using VkNet.Enums;
 
-namespace TiVkParser.Commands.Friends;
+namespace TiVkParser.Commands.SearchByKeywords;
 
-public class FriendsCommand : Command<FriendsSettings>
+public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
 {
+    private SearchByKeywordsSettings? _settings;
     private MainConfiguration? _conf;
     private VkServiceLib? _vkServiceLib;
+    private List<OutCommentModel> _outputData = new();
 
-    private User? _user;
-    private IEnumerable<long> _friends = new List<long>();
-
-    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] FriendsSettings settings)
+    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] SearchByKeywordsSettings settings)
     {
         try
         {
@@ -52,7 +52,8 @@ public class FriendsCommand : Command<FriendsSettings>
             var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(settings.ConfigFile));
             if (mainConf.AccessToken is null or "")
                 throw new Exception("Не указан AccessToken!");
-            
+
+            _settings = settings;
             _conf = mainConf;
             
             return ValidationResult.Success();
@@ -63,7 +64,7 @@ public class FriendsCommand : Command<FriendsSettings>
         }
     }
 
-    public override int Execute([NotNull] CommandContext context, [NotNull] FriendsSettings settings)
+    public override int Execute([NotNull] CommandContext context, [NotNull] SearchByKeywordsSettings settings)
     {
         /* Подготовка */
         SerilogLib.IsLogging = settings.IsLogging;
@@ -92,7 +93,7 @@ public class FriendsCommand : Command<FriendsSettings>
             .Start(Work);
         
         /* Сохранение данных */
-        ExportData.ToExcel(new ExportsDataModel { Friends = _friends });
+        ExportData.ToExcel(new ExportsDataModel { SearchByKeywords = _outputData });
         
         /* Завершение работы */
         AnsiConsoleLib.ShowHeader();
@@ -105,27 +106,66 @@ public class FriendsCommand : Command<FriendsSettings>
         
         return 0;
     }
-
+    
     private void Work(ProgressContext ctx)
     {
+        Guard.Against.Null(_settings);
         Guard.Against.Null(_conf);
-        Guard.Against.Null(_conf.Friends);
+        Guard.Against.Null(_conf.SearchByKeywords);
+        Guard.Against.Null(_conf.SearchByKeywords.GroupIds);
+        Guard.Against.Null(_conf.SearchByKeywords.Keywords);
         Guard.Against.Null(_vkServiceLib);
 
-        var userId = _conf.Friends.UserId;
-        
-        var mainProgressTask = ctx
-            .AddTask($"Получение информации о пользователе (UserID = {userId})...")
+        var groupsProgressTask = ctx
+            .AddTask($"[bold {Constants.Colors.SecondColor}]Получение групп[/]")
             .IsIndeterminate();
         
-        mainProgressTask.StartTask();
+        var groups = _vkServiceLib
+            .FetchGroupsInfo(_conf.SearchByKeywords.GroupIds.Select(groupId => groupId.ToString()))
+            .Where(group => group.IsClosed is GroupPublicity.Public)
+            .ToList();
 
-        _user = _vkServiceLib.FetchUserById(userId);
-        Guard.Against.Null(_user);
-        mainProgressTask.Description($"[bold]Пользователь:[/] [underline]{_user.FirstName} {_user.LastName}[/]");
-        
-        _friends = _vkServiceLib.FetchFriendsFromUser(userId).Select(user => user.Id);
+        if (groups.Count is 0)
+        {
+            groupsProgressTask.StopTask();
+            return;
+        }
 
-        mainProgressTask.StopTask();
+        groupsProgressTask
+            .IsIndeterminate(false)
+            .MaxValue(groups.Count);
+
+        foreach (var group in groups)
+        {
+            groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name} ({group.Id})[/]";
+            
+            var postsProgressTask = ctx
+                .AddTask($"[bold {Constants.Colors.SecondColor}]Получение постов[/]")
+                .IsIndeterminate();
+            
+            var posts = _vkServiceLib
+                .FetchPostsFromGroup(group.Id, new FetchPostsFilter(null, null))
+                .ToList();
+            
+            if (posts.Count is 0)
+            {
+                postsProgressTask.StopTask();
+                continue;
+            }
+            
+            postsProgressTask
+                .IsIndeterminate(false)
+                .MaxValue(posts.Count);
+
+            foreach (var post in posts)
+            {
+                postsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}]Пост:[/] [underline]{post.Id} ({post.Date})[/]";
+                
+                if (_settings.IsComments)
+                {
+                    
+                }
+            }
+        }
     }
 }

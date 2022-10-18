@@ -13,7 +13,7 @@ namespace TiVkParser.Logging;
 public static class SerilogLib
 {
     public static bool IsLogging { get; set; }
-    public static string FileName { get; set; } = "Log.txt";
+    public static string FileName { get; set; } = "TiVkParser.txt";
     
     private static bool _isConfiguration;
     private static Logger? _logger;

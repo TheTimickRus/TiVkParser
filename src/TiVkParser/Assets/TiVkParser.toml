@@ -24,3 +24,17 @@ user_ids = [
 group_ids = [
     
 ]
+
+#------------------------------------
+
+# Команда Keywords
+[search_by_keywords]
+# Группы
+groups_ids = [
+    
+]
+
+# Ключевые слова
+keywords = [
+    
+]
