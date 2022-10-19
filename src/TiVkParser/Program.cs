@@ -1,4 +1,5 @@
-﻿using Spectre.Console;
+﻿using System.Text;
+using Spectre.Console;
 using Spectre.Console.Cli;
 using TiVkParser;
 using TiVkParser.Commands.Friends;
@@ -7,7 +8,8 @@ using TiVkParser.Commands.Keywords;
 using TiVkParser.Logging;
 using TiVkParser.Services;
 
-Console.Title = Constants.Titles.VeryShortTitle;
+Console.OutputEncoding = Encoding.UTF8;
+Console.Title = Constants.Titles.ShortTitle;
 SerilogLib.FileName = Constants.Titles.LogFileName;
 
 var app = new CommandApp();

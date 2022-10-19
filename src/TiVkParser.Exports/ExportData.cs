@@ -8,7 +8,7 @@ namespace TiVkParser.Exports;
 
 public static class ExportData
 {
-    public static string FileName { get; set; } = "TiVkParser";
+    public static string FileName { get; set; } = "TiVkParser.xlsx";
     
     public static void ToExcel(ExportsDataModel data)
     {
