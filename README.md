@@ -3,11 +3,12 @@
 
 # Функциональность
 - [x] TiVkParser
-  - [x] TiVkParser.Groups (Команда "groups")
+  - [x] TiVkParser.Groups (Команда ```groups```)
     - [x] Получение лайков и комментариев пользователя в группах c последующим сохранением в Excel документ
-  - [x] TiVkParser.Friends (Команда "Friends")
+  - [x] TiVkParser.Friends (Команда ```friends```)
     - [x] Получение списка друзей пользователя и сохранение его в Excel документ
-
+  - [x] TiVkParser.Keywords (Команда ```keywords```)
+    - [x] Получение списка друзей пользователя и сохранение его в Excel документ
 # Конфигурационный файл
 ```c#
 # Токен доступа VK
@@ -43,11 +44,11 @@ group_ids = [
 
 <img src="screenshots/0.png" />
 
-### Команда Friends
+### Команда ```Friends```
 
 <img src="screenshots/1.png" />
 
-### Команда Groups
+### Команда ```Groups```
 
 <img src="screenshots/2.png" />
 
