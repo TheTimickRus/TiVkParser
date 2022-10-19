@@ -3,9 +3,8 @@
 // ReSharper disable ClassNeverInstantiated.Global
 
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using Ardalis.GuardClauses;
-using MoreLinq;
-using MoreLinq.Experimental;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using TiVkParser.Core;
@@ -18,23 +17,23 @@ using TiVkParser.Models.Main.ConfigurationModels;
 using TiVkParser.Services;
 using Tomlyn;
 using VkNet.Enums;
+using VkNet.Model;
+using VkNet.Model.Attachments;
 
-namespace TiVkParser.Commands.SearchByKeywords;
+namespace TiVkParser.Commands.Keywords;
 
-public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
+public class KeywordsCommand : Command<KeywordsCommandSettings>
 {
-    private SearchByKeywordsSettings? _settings;
+    private KeywordsCommandSettings? _settings;
     private MainConfiguration? _conf;
     private VkServiceLib? _vkServiceLib;
-    private List<OutCommentModel> _outputData = new();
+    private readonly List<OutCommentModel> _outputData = new();
 
-    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] SearchByKeywordsSettings settings)
+    public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] KeywordsCommandSettings commandSettings)
     {
         try
         {
-            Console.Title = Constants.Titles.VeryShortTitle;
-            
-            if (settings.IsExtractConfigFile)
+            if (commandSettings.IsExtractConfigFile)
             {
                 AnyHelpers.ExtractResourceToFile("TiVkParser", "Assets", "TiVkParser.toml", Environment.CurrentDirectory);
             
@@ -48,14 +47,14 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
                 throw new Exception("Пожалуйста, перезапустите программу...");
             }
             
-            if (settings.ConfigFile is  null || File.Exists(settings.ConfigFile) is false)
+            if (commandSettings.ConfigFile is  null || File.Exists(commandSettings.ConfigFile) is false)
                 throw new Exception("Не найден файл конфигурации!");
             
-            var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(settings.ConfigFile));
+            var mainConf = Toml.ToModel<MainConfiguration>(File.ReadAllText(commandSettings.ConfigFile));
             if (mainConf.AccessToken is null or "")
                 throw new Exception("Не указан AccessToken!");
 
-            _settings = settings;
+            _settings = commandSettings;
             _conf = mainConf;
             
             return ValidationResult.Success();
@@ -65,13 +64,13 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
             return ValidationResult.Error(ex.Message);
         }
     }
-
-    public override int Execute([NotNull] CommandContext context, [NotNull] SearchByKeywordsSettings settings)
+    
+    public override int Execute([NotNull] CommandContext context, [NotNull] KeywordsCommandSettings settings)
     {
         /* Подготовка */
         SerilogLib.IsLogging = settings.IsLogging;
         Guard.Against.Null(_conf);
-        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.TotalItemsForApi);
+        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.ApiLimit);
         AnsiConsoleLib.ShowHeader();
         
         /* Основная работа */
@@ -85,9 +84,13 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
                     RemainingStyle = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 },
-                new SpinnerColumn
+                new PercentageColumn
                 {
-                    Spinner = Spinner.Known.Hamburger, 
+                    Style = new Style(foreground: Constants.Colors.MainColor), 
+                    CompletedStyle = new Style(Constants.Colors.SuccessColor)
+                },
+                new SpinnerColumn(Spinner.Known.BouncingBar)
+                {
                     Style = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 }
@@ -109,13 +112,13 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
         return 0;
     }
     
-    private void Work(ProgressContext ctx)
+    private Task Work(ProgressContext ctx)
     {
         Guard.Against.Null(_settings);
         Guard.Against.Null(_conf);
-        Guard.Against.Null(_conf.SearchByKeywords);
-        Guard.Against.Null(_conf.SearchByKeywords.GroupIds);
-        Guard.Against.Null(_conf.SearchByKeywords.Keywords);
+        Guard.Against.Null(_conf.Keywords);
+        Guard.Against.Null(_conf.Keywords.GroupIds);
+        Guard.Against.Null(_conf.Keywords.Keywords);
         Guard.Against.Null(_vkServiceLib);
 
         var groupsProgressTask = ctx
@@ -123,14 +126,14 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
             .IsIndeterminate();
         
         var groups = _vkServiceLib
-            .FetchGroupsInfo(_conf.SearchByKeywords.GroupIds.Select(groupId => groupId.ToString()))
+            .FetchGroupsInfo(_conf.Keywords.GroupIds.Select(groupId => groupId.ToString()))
             .Where(group => group.IsClosed is GroupPublicity.Public)
             .ToList();
 
         if (groups.Count is 0)
         {
             groupsProgressTask.StopTask();
-            return;
+            return Task.CompletedTask;
         }
 
         groupsProgressTask
@@ -161,8 +164,68 @@ public class SearchByKeywordsCommand : Command<SearchByKeywordsSettings>
 
             foreach (var post in posts)
             {
+                postsProgressTask.Description($"[bold {Constants.Colors.SecondColor}]Пост:[/] [underline]{post.Id} ({post.Date})[/]");
+
+                foreach (var keyword in _conf.Keywords.Keywords)
+                {
+                    if (post.Text is not null or "" && Regex.IsMatch(post.Text.ToLower(), $"\\b{keyword}\\b"))
+                    {
+                        _outputData.Add(MappingToCommentModel(group, post, null));
+                        SerilogLib.Info($"Post = ({post.FromId},{group.Id},{post.Id})");
+                    }
+                    
+                    if (_settings.IsComments is false || post.Comments.Count <= 0) 
+                        continue;
+                    
+                    var comments = _vkServiceLib.FetchComments(group.Id, post.Id!.Value);
+                    foreach (var comment in comments)
+                    {
+                        var commentsThread = new List<Comment> { comment };
+                        if (comment.Thread.Count > 0)
+                        {
+                            Thread.Sleep(333);
+                            
+                            commentsThread.AddRange(
+                                _vkServiceLib.FetchComments(group.Id, post.Id.Value, comment.Id)
+                            ); 
+                        }
+                        
+                        foreach (
+                            var cThread in from cThread in commentsThread 
+                            where cThread.Text is not null or ""
+                            let math = _conf.Keywords.Keywords.FirstOrDefault(kw => Regex.IsMatch(cThread.Text, $"\\b{kw}\\b")) 
+                            where math != null 
+                            select cThread
+                        )
+                        {
+                            _outputData.Add(MappingToCommentModel(group, post, cThread));
+                            SerilogLib.Info($"Comment = ({post.FromId},{group.Id},{post.Id},{comment.Id})");
+                        }
+                    }
+                    
+                    Thread.Sleep(333);
+                }
                 
+                postsProgressTask.Increment(1);
             }
+            
+            groupsProgressTask.Increment(1);
         }
+        
+        return Task.CompletedTask;
+    }
+    
+    private static OutCommentModel MappingToCommentModel(VkNet.Model.Group group, Post post, Comment? comment)
+    {
+        return new OutCommentModel(
+            UserId:      post.FromId.ToString() ?? "",
+            GroupId:     group.Id.ToString(),
+            PostId:      post.Id.ToString() ?? "",
+            PostText:    post.Text,
+            CommentId:   comment?.Id.ToString() ?? "",
+            CommentText: comment?.Text ?? "",
+            UrlPost:     $"https://vk.com/{group.ScreenName}?w=wall-{group.Id}_{post.Id}",
+            UrlComment:  $"https://vk.com/{group.ScreenName}?w=wall-{group.Id}_{post.Id}_r{comment?.Id}"
+        );
     }
 }

@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using MoreLinq;
 using TiVkParser.Core.Helpers;
 using TiVkParser.Logging;
 using TiVkParser.Models.Core.ExecuteModels.FetchPosts;
@@ -85,8 +84,8 @@ public class VkServiceLib
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
-            throw;
+            SerilogLib.Error(ex);
+            return new List<long>();
         }
     }
 

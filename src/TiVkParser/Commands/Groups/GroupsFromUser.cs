@@ -60,7 +60,7 @@ internal static class GroupsFromUser
                     .IsIndeterminate();
 
                 var filter = new FetchPostsFilter(
-                    settings.TotalItemsForApi,
+                    settings.ApiLimit,
                     settings.DateFilter
                 );
                 

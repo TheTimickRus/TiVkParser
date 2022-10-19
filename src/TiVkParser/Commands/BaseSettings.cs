@@ -12,10 +12,10 @@ public class BaseSettings : CommandSettings
     [DefaultValue("TiVkParser.toml")]
     public string? ConfigFile { get; init; }
     
-    [Description("Максимальное кол-во элементов для всех запросов, получаемых через VK API (Default = 1000)")]
+    [Description("Максимальное кол-во элементов для всех запросов, получаемых через VK API (Default = 2500)")]
     [CommandOption("-l|--apiLimit")]
-    [DefaultValue((long)1000)]
-    public long TotalItemsForApi { get; init; }
+    [DefaultValue((long)2500)]
+    public long ApiLimit { get; init; }
     
     [Description("Извлечь пустой файл конфигурации (Default = false)")]
     [CommandOption("--extCfg")]

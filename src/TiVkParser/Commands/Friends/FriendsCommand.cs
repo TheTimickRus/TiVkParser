@@ -68,7 +68,7 @@ public class FriendsCommand : Command<FriendsSettings>
         /* Подготовка */
         SerilogLib.IsLogging = settings.IsLogging;
         Guard.Against.Null(_conf);
-        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.TotalItemsForApi);
+        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.ApiLimit);
         AnsiConsoleLib.ShowHeader();
         
         /* Основная работа */

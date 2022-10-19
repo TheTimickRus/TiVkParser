@@ -16,7 +16,7 @@ public static class ExportData
 
         if (File.Exists(filename))
         {
-            File.Copy(filename, $"{Path.GetFileNameWithoutExtension(filename)}_backup{new Random(Environment.TickCount).Next(1000, 9999)}.xlsx");
+            File.Copy(filename, $"{Path.GetFileNameWithoutExtension(filename)}_backup{new Random(Environment.TickCount).Next(100000, 999999)}.xlsx");
             File.Delete(filename);
         }
         
@@ -41,10 +41,10 @@ public static class ExportData
             sheet.Cells["A1"].LoadFromCollection(data.Friends, true);
         }
         
-        if (data.Friends != null)
+        if (data.SearchByKeywords != null)
         {
-            var sheet = package.Workbook.Worksheets.Add("Friends");
-            sheet.Cells["A1"].LoadFromCollection(data.Friends, true);
+            var sheet = package.Workbook.Worksheets.Add("SearchByKeywords");
+            sheet.Cells["A1"].LoadFromCollection(data.SearchByKeywords, true);
         }
         
         package.Save();

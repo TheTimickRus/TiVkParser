@@ -34,7 +34,7 @@ public static class GroupsFromConfig
         
         groupsProgressTask.IsIndeterminate = false;
         groupsProgressTask.MaxValue = groups.Count;
-
+        
         foreach (var group in groups)
         {
             groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name} ({group.Id})[/]";
@@ -44,7 +44,7 @@ public static class GroupsFromConfig
                 .IsIndeterminate();
 
             var filter = new FetchPostsFilter(
-                settings.TotalItemsForApi,
+                settings.ApiLimit,
                 settings.DateFilter
             );
             

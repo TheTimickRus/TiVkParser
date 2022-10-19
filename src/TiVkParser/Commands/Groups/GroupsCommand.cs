@@ -74,7 +74,7 @@ public class GroupsCommand : Command<GroupsSettings>
         Guard.Against.Null(_conf.Groups);
         // Проверки
         
-        var vkLib = new VkServiceLib(_conf.AccessToken, settings.TotalItemsForApi);
+        var vkLib = new VkServiceLib(_conf.AccessToken, settings.ApiLimit);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
