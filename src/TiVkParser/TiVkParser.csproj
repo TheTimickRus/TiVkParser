@@ -6,8 +6,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <Company>Timick</Company>
-        <AssemblyVersion>2.0</AssemblyVersion>
-        <FileVersion>2.0</FileVersion>
+        <AssemblyVersion>2.1</AssemblyVersion>
+        <FileVersion>2.1</FileVersion>
         <NeutralLanguage>ru</NeutralLanguage>
         <Product>TiVkParser by Timick</Product>
         <LangVersion>preview</LangVersion>

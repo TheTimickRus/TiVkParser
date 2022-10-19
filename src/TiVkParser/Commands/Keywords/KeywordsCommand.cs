@@ -2,6 +2,7 @@
 // ReSharper disable RedundantNullableFlowAttribute
 // ReSharper disable ClassNeverInstantiated.Global
 
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using Ardalis.GuardClauses;
@@ -80,35 +81,46 @@ public class KeywordsCommand : Command<KeywordsCommandSettings>
                 new TaskDescriptionColumn(), 
                 new ProgressBarColumn
                 {
-                    IndeterminateStyle = new Style(foreground: Constants.Colors.MainColor),
+                    IndeterminateStyle = new Style(foreground: Constants.Colors.SecondColor, background: Constants.Colors.MainColor),
                     RemainingStyle = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 },
                 new PercentageColumn
                 {
-                    Style = new Style(foreground: Constants.Colors.MainColor), 
+                    Style = new Style(foreground: Constants.Colors.SecondColor), 
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 },
-                new SpinnerColumn(Spinner.Known.BouncingBar)
+                new SpinnerColumn(Spinner.Known.SimpleDotsScrolling)
                 {
-                    Style = new Style(foreground: Constants.Colors.MainColor),
+                    Style = new Style(foreground: Constants.Colors.SecondColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 }
             )
             .Start(Work);
         
         /* Сохранение данных */
-        ExportData.ToExcel(new ExportsDataModel { SearchByKeywords = _outputData });
-        
-        /* Завершение работы */
         AnsiConsoleLib.ShowHeader();
+        AnsiConsole.MarkupLine("Сохранение данных...");
+        ExportData.ToExcel(new ExportsDataModel { SearchByKeywords = _outputData });
+        AnsiConsole.MarkupLine("Данные успешно сохранены!\n");
+        
+        /* Запуск сохраненного файла */
+        var prompt = new SelectionPrompt<string>()
+            .HighlightStyle(new Style(foreground: Constants.Colors.SecondColor))
+            .Title("Запустить сохраненный файл?")
+            .AddChoices("Да", "Нет");
+        
+        if (AnsiConsole.Prompt(prompt) == "Да")
+            Process.Start("cmd", $"/c {Path.Combine(Environment.CurrentDirectory, ExportData.FileName)}");
+
+        /* Завершение работы */
         AnsiConsoleLib.ShowRule(
-            "Работа программы завершена! Для завершения нажмите любою кнопку", 
+            "Работа программы завершена! Нажмите любою кнопку, чтобы выйти", 
             Justify.Center, 
             Constants.Colors.SuccessColor
         );
-        AnsiConsole.Console.Input.ReadKey(true);
         
+        AnsiConsole.Console.Input.ReadKey(true);
         return 0;
     }
     
