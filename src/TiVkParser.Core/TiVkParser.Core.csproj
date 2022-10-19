@@ -5,9 +5,13 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>preview</LangVersion>
+        <Company>Timick</Company>
+        <AssemblyVersion>1.0</AssemblyVersion>
+        <FileVersion>1.0</FileVersion>
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="morelinq" Version="3.3.2" />
       <PackageReference Include="VkNet" Version="1.71.0" />
     </ItemGroup>
 

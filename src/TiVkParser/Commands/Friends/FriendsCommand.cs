@@ -2,6 +2,7 @@
 // ReSharper disable RedundantNullableFlowAttribute
 // ReSharper disable ClassNeverInstantiated.Global
 
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Ardalis.GuardClauses;
 using Spectre.Console;
@@ -10,6 +11,7 @@ using TiVkParser.Core;
 using TiVkParser.Exports;
 using TiVkParser.Helpers;
 using TiVkParser.Logging;
+using TiVkParser.Models.Exports;
 using TiVkParser.Models.Main.ConfigurationModels;
 using TiVkParser.Services;
 using Tomlyn;
@@ -67,7 +69,7 @@ public class FriendsCommand : Command<FriendsSettings>
         /* Подготовка */
         SerilogLib.IsLogging = settings.IsLogging;
         Guard.Against.Null(_conf);
-        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.TotalItemsForApi);
+        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.ApiLimit);
         AnsiConsoleLib.ShowHeader();
         
         /* Основная работа */
@@ -81,31 +83,41 @@ public class FriendsCommand : Command<FriendsSettings>
                     RemainingStyle = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 },
-                new SpinnerColumn
+                new SpinnerColumn(Spinner.Known.SimpleDotsScrolling)
                 {
-                    Spinner = Spinner.Known.Hamburger, 
-                    Style = new Style(foreground: Constants.Colors.MainColor),
+                    Style = new Style(foreground: Constants.Colors.SecondColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 }
             )
             .Start(Work);
         
         /* Сохранение данных */
-        ExportData.ToExcel((null, null, _friends));
-        
-        /* Завершение работы */
         AnsiConsoleLib.ShowHeader();
+        AnsiConsole.MarkupLine("Сохранение данных...");
+        ExportData.ToExcel(new ExportsDataModel { Friends = _friends });
+        AnsiConsole.MarkupLine("Данные успешно сохранены!\n");
+
+        /* Запуск сохраненного файла */
+        var prompt = new SelectionPrompt<string>()
+            .HighlightStyle(new Style(foreground: Constants.Colors.SecondColor))
+            .Title("Запустить сохраненный файл?")
+            .AddChoices("Да", "Нет");
+        
+        if (AnsiConsole.Prompt(prompt) == "Да")
+            Process.Start("cmd", $"/c {Path.Combine(Environment.CurrentDirectory, ExportData.FileName)}");
+
+        /* Завершение работы */
         AnsiConsoleLib.ShowRule(
-            "Работа программы завершена! Для завершения нажмите любою кнопку", 
+            "Работа программы завершена! Нажмите любою кнопку, чтобы выйти", 
             Justify.Center, 
             Constants.Colors.SuccessColor
         );
-        AnsiConsole.Console.Input.ReadKey(true);
         
+        AnsiConsole.Console.Input.ReadKey(true);
         return 0;
     }
 
-    private Task Work(ProgressContext ctx)
+    private void Work(ProgressContext ctx)
     {
         Guard.Against.Null(_conf);
         Guard.Against.Null(_conf.Friends);
@@ -113,17 +125,18 @@ public class FriendsCommand : Command<FriendsSettings>
 
         var userId = _conf.Friends.UserId;
         
-        var tsk = ctx.AddTask($"Получение информации о пользователе (UserID = {userId})...");
-        tsk.IsIndeterminate = true;
-        tsk.StartTask();
+        var mainProgressTask = ctx
+            .AddTask($"Получение информации о пользователе (UserID = {userId})...")
+            .IsIndeterminate();
+        
+        mainProgressTask.StartTask();
 
         _user = _vkServiceLib.FetchUserById(userId);
         Guard.Against.Null(_user);
-        tsk.Description($"[bold]Пользователь:[/] [underline]{_user.FirstName} {_user.LastName}[/]");
+        mainProgressTask.Description($"[bold]Пользователь:[/] [underline]{_user.FirstName} {_user.LastName}[/]");
         
         _friends = _vkServiceLib.FetchFriendsFromUser(userId).Select(user => user.Id);
 
-        tsk.StopTask();
-        return Task.CompletedTask;
+        mainProgressTask.StopTask();
     }
 }

@@ -2,6 +2,7 @@
 // ReSharper disable RedundantNullableFlowAttribute
 // ReSharper disable ClassNeverInstantiated.Global
 
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Ardalis.GuardClauses;
 using Spectre.Console;
@@ -21,7 +22,7 @@ public class GroupsCommand : Command<GroupsSettings>
 {
     private MainConfiguration? _conf;
 
-    private (List<OutLike>, List<OutComment>) _outputData;
+    private (List<OutLikeModel>, List<OutCommentModel>) _outputData;
     
     public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] GroupsSettings settings)
     {
@@ -67,15 +68,14 @@ public class GroupsCommand : Command<GroupsSettings>
         AnsiConsoleLib.ShowHeader();
         
         SerilogLib.IsLogging = true;
-        SerilogLib.FileName = Constants.Titles.LogFileName;
-        
+
         // Проверки
         Guard.Against.Null(_conf);
         Guard.Against.Null(_conf.AccessToken);
         Guard.Against.Null(_conf.Groups);
         // Проверки
         
-        var vkLib = new VkServiceLib(_conf.AccessToken, settings.TotalItemsForApi);
+        var vkLib = new VkServiceLib(_conf.AccessToken, settings.ApiLimit);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
@@ -83,19 +83,18 @@ public class GroupsCommand : Command<GroupsSettings>
                 new TaskDescriptionColumn(), 
                 new ProgressBarColumn
                 {
-                    IndeterminateStyle = new Style(foreground: Constants.Colors.MainColor),
+                    IndeterminateStyle = new Style(foreground: Constants.Colors.SecondColor, background: Constants.Colors.MainColor),
                     RemainingStyle = new Style(foreground: Constants.Colors.MainColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 },
                 new PercentageColumn
                 {
-                    Style = new Style(foreground: Constants.Colors.MainColor),
+                    Style = new Style(foreground: Constants.Colors.SecondColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 },
-                new SpinnerColumn
+                new SpinnerColumn(Spinner.Known.SimpleDotsScrolling)
                 {
-                    Spinner = Spinner.Known.Hamburger, 
-                    Style = new Style(foreground: Constants.Colors.MainColor),
+                    Style = new Style(foreground: Constants.Colors.SecondColor),
                     CompletedStyle = new Style(Constants.Colors.SuccessColor)
                 }
             )
@@ -109,17 +108,28 @@ public class GroupsCommand : Command<GroupsSettings>
             });
         
         /* Сохранение данных */
-        ExportData.ToExcel((_outputData.Item1, _outputData.Item2, null));
+        AnsiConsoleLib.ShowHeader();
+        AnsiConsole.MarkupLine("Сохранение данных...");
+        ExportData.ToExcel(new ExportsDataModel { Likes = _outputData.Item1, Comments = _outputData.Item2 });
+        AnsiConsole.MarkupLine("Данные успешно сохранены!\n");
+
+        /* Запуск сохраненного файла */
+        var prompt = new SelectionPrompt<string>()
+            .HighlightStyle(new Style(foreground: Constants.Colors.SecondColor))
+            .Title("Запустить сохраненный файл?")
+            .AddChoices("Да", "Нет");
+        
+        if (AnsiConsole.Prompt(prompt) == "Да")
+            Process.Start("cmd", $"/c {Path.Combine(Environment.CurrentDirectory, ExportData.FileName)}");
         
         /* Завершение работы */
-        AnsiConsoleLib.ShowHeader();
         AnsiConsoleLib.ShowRule(
-            "Работа программы завершена! Для завершения нажмите любою кнопку", 
+            "Работа программы завершена! Нажмите любою кнопку, чтобы выйти", 
             Justify.Center, 
             Constants.Colors.SuccessColor
         );
-        AnsiConsole.Console.Input.ReadKey(true);
         
+        AnsiConsole.Console.Input.ReadKey(true);
         return 0;
     }
 }

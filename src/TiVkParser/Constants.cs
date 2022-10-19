@@ -11,11 +11,11 @@ public static class Constants
         /// <summary>
         /// *Версия программы* (v.1.0)
         /// </summary>
-        public const string Version = "v.2.0";
+        public const string Version = "v.2.1";
         /// <summary>
         /// *Версия программы с датой* (v.1.0 (02.09.2022))
         /// </summary>
-        public const string VersionWithDate = $"{Version} (17.10.2022)";
+        public const string VersionWithDate = $"{Version} (19.10.2022)";
         /// <summary>
         /// *Название программы* (*Версия* (*дата*)) by *Разработчик*
         /// </summary>
@@ -39,15 +39,15 @@ public static class Constants
         /// <summary>
         /// Основной цвет
         /// </summary>
-        public static readonly Color MainColor = Color.Purple;
+        public static readonly Color MainColor = Color.Plum4;
         /// <summary>
         /// Второй цвет
         /// </summary>
-        public static readonly Color SecondColor = Color.MediumPurple;
+        public static readonly Color SecondColor = Color.SlateBlue1;
         /// <summary>
         /// Цвет успеха
         /// </summary>
-        public static readonly Color SuccessColor = Color.SeaGreen1;
+        public static readonly Color SuccessColor = Color.Lime;
         /// <summary>
         /// Цвет ошибки
         /// </summary>

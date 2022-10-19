@@ -1,3 +1,4 @@
+using MoreLinq;
 using Spectre.Console;
 using TiVkParser.Core;
 using TiVkParser.Logging;
@@ -17,10 +18,10 @@ internal static class GroupsFromUser
     /// <param name="settings"></param>
     /// <param name="conf"></param>
     /// <param name="vkServiceLib"></param>
-    public static (List<OutLike>, List<OutComment>) Execute(ProgressContext ctx, GroupsSettings settings, GroupsConfiguration conf, VkServiceLib vkServiceLib)
+    public static (List<OutLikeModel>, List<OutCommentModel>) Execute(ProgressContext ctx, GroupsSettings settings, GroupsConfiguration conf, VkServiceLib vkServiceLib)
     {
-        var outLikes = new List<OutLike>();
-        var outComments = new List<OutComment>();
+        var outLikes = new List<OutLikeModel>();
+        var outComments = new List<OutCommentModel>();
         
         var usersProgressTask = ctx
             .AddTask("[bold]Получение пользователей[/]")
@@ -59,7 +60,7 @@ internal static class GroupsFromUser
                     .IsIndeterminate();
 
                 var filter = new FetchPostsFilter(
-                    settings.TotalItemsForApi,
+                    settings.ApiLimit,
                     settings.DateFilter
                 );
                 
@@ -92,7 +93,7 @@ internal static class GroupsFromUser
                         foreach (var _ in likes.Where(like => like.Id == user?.Id))
                         {
                             outLikes.Add(
-                                new OutLike(
+                                new OutLikeModel(
                                     user?.Id.ToString(), 
                                     group.Id.ToString(), 
                                     post.Id?.ToString(),
@@ -129,7 +130,7 @@ internal static class GroupsFromUser
                                     continue;
 
                                 outComments.Add(
-                                    new OutComment(
+                                    new OutCommentModel(
                                         userId,
                                         group.Id.ToString(),
                                         post.Id.ToString(),
