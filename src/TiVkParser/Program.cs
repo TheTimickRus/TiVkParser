@@ -3,8 +3,12 @@ using Spectre.Console.Cli;
 using TiVkParser;
 using TiVkParser.Commands.Friends;
 using TiVkParser.Commands.Groups;
+using TiVkParser.Commands.Keywords;
 using TiVkParser.Logging;
 using TiVkParser.Services;
+
+Console.Title = Constants.Titles.VeryShortTitle;
+SerilogLib.FileName = Constants.Titles.LogFileName;
 
 var app = new CommandApp();
 app.Configure(conf =>
@@ -24,6 +28,12 @@ app.Configure(conf =>
         .WithExample(new[] { "gr", "--apiLimit 10000" })
         .WithExample(new[] { "gr", "--likes" })
         .WithExample(new[] { "gr", "--date=10.16.2022", "--likes=true", "--comments=false" });
+
+    conf.AddCommand<KeywordsCommand>("keywords")
+        .WithAlias("kw")
+        .WithDescription("Получение постов и/или комментариев по ключевым словам")
+        .WithExample(new[] { "keyword" })
+        .WithExample(new[] { "kw" });
 
     conf.Settings.ApplicationName = $"{Constants.Titles.VeryShortTitle}.exe";
     conf.Settings.ApplicationVersion = Constants.Titles.VersionWithDate;

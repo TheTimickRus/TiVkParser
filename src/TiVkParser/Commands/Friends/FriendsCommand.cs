@@ -10,6 +10,7 @@ using TiVkParser.Core;
 using TiVkParser.Exports;
 using TiVkParser.Helpers;
 using TiVkParser.Logging;
+using TiVkParser.Models.Exports;
 using TiVkParser.Models.Main.ConfigurationModels;
 using TiVkParser.Services;
 using Tomlyn;
@@ -67,7 +68,7 @@ public class FriendsCommand : Command<FriendsSettings>
         /* Подготовка */
         SerilogLib.IsLogging = settings.IsLogging;
         Guard.Against.Null(_conf);
-        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.TotalItemsForApi);
+        _vkServiceLib = new VkServiceLib(_conf.AccessToken!, settings.ApiLimit);
         AnsiConsoleLib.ShowHeader();
         
         /* Основная работа */
@@ -91,7 +92,7 @@ public class FriendsCommand : Command<FriendsSettings>
             .Start(Work);
         
         /* Сохранение данных */
-        ExportData.ToExcel((null, null, _friends));
+        ExportData.ToExcel(new ExportsDataModel { Friends = _friends });
         
         /* Завершение работы */
         AnsiConsoleLib.ShowHeader();
@@ -105,7 +106,7 @@ public class FriendsCommand : Command<FriendsSettings>
         return 0;
     }
 
-    private Task Work(ProgressContext ctx)
+    private void Work(ProgressContext ctx)
     {
         Guard.Against.Null(_conf);
         Guard.Against.Null(_conf.Friends);
@@ -113,17 +114,18 @@ public class FriendsCommand : Command<FriendsSettings>
 
         var userId = _conf.Friends.UserId;
         
-        var tsk = ctx.AddTask($"Получение информации о пользователе (UserID = {userId})...");
-        tsk.IsIndeterminate = true;
-        tsk.StartTask();
+        var mainProgressTask = ctx
+            .AddTask($"Получение информации о пользователе (UserID = {userId})...")
+            .IsIndeterminate();
+        
+        mainProgressTask.StartTask();
 
         _user = _vkServiceLib.FetchUserById(userId);
         Guard.Against.Null(_user);
-        tsk.Description($"[bold]Пользователь:[/] [underline]{_user.FirstName} {_user.LastName}[/]");
+        mainProgressTask.Description($"[bold]Пользователь:[/] [underline]{_user.FirstName} {_user.LastName}[/]");
         
         _friends = _vkServiceLib.FetchFriendsFromUser(userId).Select(user => user.Id);
 
-        tsk.StopTask();
-        return Task.CompletedTask;
+        mainProgressTask.StopTask();
     }
 }

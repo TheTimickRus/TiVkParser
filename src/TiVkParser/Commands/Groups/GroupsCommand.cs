@@ -21,7 +21,7 @@ public class GroupsCommand : Command<GroupsSettings>
 {
     private MainConfiguration? _conf;
 
-    private (List<OutLike>, List<OutComment>) _outputData;
+    private (List<OutLikeModel>, List<OutCommentModel>) _outputData;
     
     public override ValidationResult Validate([NotNull] CommandContext context, [NotNull] GroupsSettings settings)
     {
@@ -67,15 +67,14 @@ public class GroupsCommand : Command<GroupsSettings>
         AnsiConsoleLib.ShowHeader();
         
         SerilogLib.IsLogging = true;
-        SerilogLib.FileName = Constants.Titles.LogFileName;
-        
+
         // Проверки
         Guard.Against.Null(_conf);
         Guard.Against.Null(_conf.AccessToken);
         Guard.Against.Null(_conf.Groups);
         // Проверки
         
-        var vkLib = new VkServiceLib(_conf.AccessToken, settings.TotalItemsForApi);
+        var vkLib = new VkServiceLib(_conf.AccessToken, settings.ApiLimit);
 
         AnsiConsole.Progress()
             .HideCompleted(true)
@@ -109,7 +108,7 @@ public class GroupsCommand : Command<GroupsSettings>
             });
         
         /* Сохранение данных */
-        ExportData.ToExcel((_outputData.Item1, _outputData.Item2, null));
+        ExportData.ToExcel(new ExportsDataModel { Likes = _outputData.Item1, Comments = _outputData.Item2 });
         
         /* Завершение работы */
         AnsiConsoleLib.ShowHeader();

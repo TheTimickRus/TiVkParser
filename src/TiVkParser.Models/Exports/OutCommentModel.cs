@@ -2,7 +2,7 @@
 
 namespace TiVkParser.Models.Exports;
 
-public record OutComment(
+public record OutCommentModel(
     string? UserId, 
     string? GroupId, 
     string? PostId, 

@@ -84,8 +84,8 @@ public class VkServiceLib
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
-            throw;
+            SerilogLib.Error(ex);
+            return new List<long>();
         }
     }
 
@@ -168,7 +168,6 @@ public class VkServiceLib
                     break;
                 
                 var response = Execute(_api, sfGroupId, pagination.CurrentOffset);
-            
                 for (var i = 0; i < response.Posts.Ids?.Count; i++)
                 {
                     for (var j = 0; j < response.Posts.Ids?[i].Count; j++)

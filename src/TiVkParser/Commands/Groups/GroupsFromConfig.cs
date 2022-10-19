@@ -18,10 +18,10 @@ public static class GroupsFromConfig
     /// <param name="settings"></param>
     /// <param name="conf"></param>
     /// <param name="vkServiceLib"></param>
-    public static (List<OutLike>, List<OutComment>) Execute(ProgressContext ctx, GroupsSettings settings, GroupsConfiguration conf, VkServiceLib vkServiceLib)
+    public static (List<OutLikeModel>, List<OutCommentModel>) Execute(ProgressContext ctx, GroupsSettings settings, GroupsConfiguration conf, VkServiceLib vkServiceLib)
     {
-        var outLikes = new List<OutLike>();
-        var outComments = new List<OutComment>();
+        var outLikes = new List<OutLikeModel>();
+        var outComments = new List<OutCommentModel>();
         
         var groupsProgressTask = ctx
             .AddTask($"[bold {Constants.Colors.SecondColor}]Получение групп[/]")
@@ -34,7 +34,7 @@ public static class GroupsFromConfig
         
         groupsProgressTask.IsIndeterminate = false;
         groupsProgressTask.MaxValue = groups.Count;
-
+        
         foreach (var group in groups)
         {
             groupsProgressTask.Description = $"[bold {Constants.Colors.SecondColor}] Группа:[/] [underline]{group.Name} ({group.Id})[/]";
@@ -44,7 +44,7 @@ public static class GroupsFromConfig
                 .IsIndeterminate();
 
             var filter = new FetchPostsFilter(
-                settings.TotalItemsForApi,
+                settings.ApiLimit,
                 settings.DateFilter
             );
             
@@ -76,7 +76,7 @@ public static class GroupsFromConfig
                         foreach (var userId in conf.UserIds.Where(userId => like.Id == Convert.ToInt64(userId)))
                         {
                             outLikes.Add(
-                                new OutLike(
+                                new OutLikeModel(
                                     userId, 
                                     group.Id.ToString(), 
                                     post.Id?.ToString(),
@@ -116,7 +116,7 @@ public static class GroupsFromConfig
                                 continue;
                             
                             outComments.Add(
-                                new OutComment(
+                                new OutCommentModel(
                                     userId,
                                     group.Id.ToString(),
                                     post.Id.ToString(), 
