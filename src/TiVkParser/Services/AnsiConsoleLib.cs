@@ -6,7 +6,7 @@ public static class AnsiConsoleLib
 {
     public static void ShowFiglet(string text, Justify? alignment, Color? color)
     {
-        AnsiConsole.Write(new FigletText(text) { Alignment = alignment, Color = color });
+        AnsiConsole.Write(new FigletText(text) { Justification = alignment, Color = color });
         AnsiConsole.WriteLine();
     }
 
@@ -15,7 +15,7 @@ public static class AnsiConsoleLib
         AnsiConsole.Write(
             new Rule(text)
             {
-                Alignment = alignment,
+                Justification = alignment,
                 Style = new Style(color)
             });
         AnsiConsole.WriteLine();
